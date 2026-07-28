@@ -300,8 +300,8 @@ export default function TestPage() {
               <h2 style={questionStyle}>¿Cuál es tu edad?</h2>
               <p style={hintStyle}>Tu etapa de vida financiera contextualiza el arquetipo.</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
-                <input type="number" min="18" max="99" value={form.edad}
-                  onChange={(e) => setForm({ ...form, edad: Number(e.target.value) })}
+                <input type="number" min="18" max="99" value={form.edad || ''} placeholder="28"
+                  onChange={(e) => setForm({ ...form, edad: e.target.value === '' ? 0 : Number(e.target.value) })}
                   style={{ ...inputStyle, width: 110, textAlign: 'center', fontSize: 28, fontWeight: 700, fontFamily: 'var(--mono)' }} />
                 <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 15 }}>años</span>
               </div>
