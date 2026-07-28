@@ -616,7 +616,7 @@ export default function Landing() {
         <section className="hero" data-reveal>
           <div className="hero-grid">
             <div>
-              <h1 data-split data-tint="1,2">
+              <h1 data-split>
                 ¿Debes declarar renta este año?
               </h1>
               <p className="hero__sub fade">El primer paso es conocer hasta cuándo tienes tiempo de presentar la declaración</p>
