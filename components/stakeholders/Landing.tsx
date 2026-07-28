@@ -53,6 +53,7 @@ export default function Landing() {
   const [agNombre, setAgNombre] = useState('');
   const [agCorreo, setAgCorreo] = useState('');
   const [agTel, setAgTel] = useState('');
+  const [agMedio, setAgMedio] = useState<'llamada' | 'videollamada' | 'whatsapp'>('llamada');
   const [agDateSelected, setAgDateSelected] = useState<Date | null>(null);
   const [agHoraSelected, setAgHoraSelected] = useState('');
   const [agErr, setAgErr] = useState('');
@@ -128,6 +129,7 @@ export default function Landing() {
     setAgNombre('');
     setAgCorreo('');
     setAgTel('');
+    setAgMedio('llamada');
     setAgDateSelected(null);
     setAgHoraSelected('');
     setAgErr('');
@@ -177,19 +179,19 @@ export default function Landing() {
     setAgErr('');
 
     if (!agNombre.trim()) {
-      setAgErr('Escribe tu nombre.');
-      return;
-    }
-    if (!agDateSelected) {
-      setAgErr('Elige una fecha disponible.');
+      setAgErr('Escribe tu nombre completo.');
       return;
     }
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(agCorreo)) {
-      setAgErr('Revisa tu correo.');
+      setAgErr('Ingresa un correo electrónico válido.');
       return;
     }
     if (agTel.replace(/\D/g, '').length < 7) {
-      setAgErr('Revisa tu número de contacto.');
+      setAgErr('Ingresa tu número de celular o WhatsApp.');
+      return;
+    }
+    if (!agDateSelected) {
+      setAgErr('Selecciona una fecha disponible en el calendario.');
       return;
     }
 
@@ -199,7 +201,7 @@ export default function Landing() {
       const year = agDateSelected.getFullYear();
       const month = String(agDateSelected.getMonth() + 1).padStart(2, '0');
       const day = String(agDateSelected.getDate()).padStart(2, '0');
-      const formattedDateStr = `${year}-${month}-${day}`;
+      const fecha = `${year}-${month}-${day}`;
 
       const res = await fetch('/api/agendar', {
         method: 'POST',
@@ -208,82 +210,95 @@ export default function Landing() {
           nombre: agNombre,
           correo: agCorreo,
           celular: agTel,
-          fecha: formattedDateStr,
+          fecha,
           hora: agHoraSelected || '08:00',
+          medio_contacto: agMedio,
         }),
       });
 
       const data = await res.json();
-
-      if (!res.ok || data.error) {
-        setAgErr(data.error || 'Ocurrió un error al agendar la consulta.');
-        setAgSubmitting(false);
-        return;
+      if (!res.ok) {
+        throw new Error(data.error || 'Error al agendar cita');
       }
 
-      const f = agDateSelected;
-      const fechaTexto = `${f.getDate()} de ${MESES_NOMBRES[f.getMonth()]} de ${f.getFullYear()}`;
-      const horaTexto = agHoraSelected ? ` a las ${agHoraSelected}` : '';
       setAgDoneTxt(
-        `Gracias, ${agNombre.trim().split(' ')[0]}. Te contactaremos para confirmar tu consulta del ${fechaTexto}${horaTexto}.`
+        `¡Perfecto ${agNombre}! Hemos agendado tu sesión para el ${day}/${month}/${year} a las ${
+          agHoraSelected || '08:00'
+        } vía ${agMedio.toUpperCase()}. Un contador se comunicará contigo.`
       );
-    } catch (err) {
-      console.error('Error enviando cita:', err);
-      setAgErr('Error de conexión. Por favor intenta de nuevo.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'No se pudo agendar la cita. Inténtalo de nuevo.';
+      setAgErr(msg);
     } finally {
       setAgSubmitting(false);
     }
   };
 
-  // Date Finder input change handler
+  // Date finder handler
   const handleCedInput = (val: string) => {
-    const v = val.replace(/\D/g, '').slice(0, 2);
-    setCedInput(v);
-    if (v.length === 2) {
-      setFinderResult({ html: resolveCedula(v), hasResult: true });
-    } else if (v.length === 1) {
-      setFinderResult({ html: '<p class="finder__hint">Falta un dígito.</p>', hasResult: false });
-    } else {
-      setFinderResult({ html: '<p class="finder__hint">Escríbelos y te digo tu fecha.</p>', hasResult: false });
-    }
-  };
+    const clean = val.replace(/\D/g, '').slice(0, 2);
+    setCedInput(clean);
 
-  const resolveCedula = (raw: string) => {
-    let n = parseInt(raw, 10);
-    if (n === 0) n = 100;
-    const [dia, mes] = FECHAS[Math.ceil(n / 2) - 1].split(' ');
-    const [idx, nombre] = MES_MAP[mes];
-    const fecha = new Date(2026, idx, +dia);
+    if (clean.length < 2) {
+      setFinderResult({
+        html: '<p class="finder__hint">Escríbelos y te digo tu fecha.</p>',
+        hasResult: false,
+      });
+      return;
+    }
+
+    const last2 = parseInt(clean, 10);
+    const idx = Math.floor(last2 / 2);
+    const str = FECHAS[idx] || FECHAS[FECHAS.length - 1];
+    const parts = str.split(' ');
+    const num = parseInt(parts[0], 10);
+    const code = parts[1];
+    const meta = MES_MAP[code] || [7, 'agosto'];
+    const año = 2026;
+    const mesNom = meta[1];
+    const fechaObj = new Date(año, meta[0], num);
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
-    const dias = Math.round((fecha.getTime() - hoy.getTime()) / 86400000);
-    const meta =
-      dias > 0
-        ? `Faltan ${dias} días. Declaración y pago el mismo día.`
-        : 'Fecha ya vencida. Consulta con el equipo.';
-    return `<div><p class="finder__cap">Tu fecha límite</p>
-            <p class="finder__date">${+dia} de ${nombre}, 2026</p>
-            <p class="finder__meta">${meta}</p></div>`;
+
+    const esHoy = fechaObj.getTime() === hoy.getTime();
+    const esPasada = fechaObj.getTime() < hoy.getTime();
+
+    let tag = '';
+    if (esHoy) {
+      tag = '<span class="finder__tag finder__tag--warning">¡Tu plazo vence HOY!</span>';
+    } else if (esPasada) {
+      tag = '<span class="finder__tag finder__tag--alert">Fecha límite superada · Renta extemporánea</span>';
+    }
+
+    setFinderResult({
+      html: `
+        ${tag}
+        <p class="finder__val">Límite: <strong>${num} de ${mesNom} de ${año}</strong></p>
+        <p class="finder__sub">Dígitos ${clean} · Calendario DIAN Personas Naturales</p>
+      `,
+      hasResult: true,
+    });
   };
 
-  // Main Effect: Canvas stars, scroll choreography, observers
+  // Clamp math helper
+  const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+
+  // Initialize scripts and scroll effects
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;
 
     const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 
-    // 1. Stars Canvas
+    // 1. Optimized Starfield Atmosphere
     const cv = root.querySelector('#stars') as HTMLCanvasElement | null;
-    let starsRaf: number | null = null;
     let starsCleanup: (() => void) | null = null;
 
     if (cv) {
       const ctx = cv.getContext('2d');
       if (ctx) {
         let stars: Array<{ x: number; y: number; r: number; a: number; s: number; t: number }> = [];
-        let w = 0, h = 0, dpr = 1;
+        let w = 0, h = 0, dpr = 1, starsRaf: number | null = null;
 
         const buildStars = () => {
           dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -291,11 +306,9 @@ export default function Landing() {
           h = window.innerHeight;
           cv.width = w * dpr;
           cv.height = h * dpr;
-          cv.style.width = w + 'px';
-          cv.style.height = h + 'px';
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-          const n = Math.round((w * h) / 12000);
-          stars = Array.from({ length: Math.min(n, 260) }, () => ({
+          const maxStars = w < 768 ? 90 : 180;
+          stars = Array.from({ length: maxStars }, () => ({
             x: Math.random() * w,
             y: Math.random() * h * 1.6 - h * 0.3,
             r: Math.random() < 0.88 ? Math.random() * 0.7 + 0.25 : Math.random() * 1.1 + 0.8,
@@ -306,9 +319,14 @@ export default function Landing() {
         };
 
         let yVal = 0;
-        const drawStars = () => {
+        let lastFrameTime = 0;
+        const drawStars = (now: number) => {
+          // Limit to 30 FPS for buttery smooth scroll performance
+          if (now - lastFrameTime < 32) return;
+          lastFrameTime = now;
+
           ctx.clearRect(0, 0, w, h);
-          const time = performance.now() / 2600;
+          const time = now / 2600;
           for (const st of stars) {
             let py = st.y - yVal * st.s * 0.16;
             py = (((py % (h * 1.6)) + h * 1.6) % (h * 1.6)) - h * 0.3;
@@ -322,22 +340,22 @@ export default function Landing() {
           ctx.globalAlpha = 1;
         };
 
-        const loopStars = () => {
-          drawStars();
+        const loopStars = (now: number) => {
+          drawStars(now);
           starsRaf = requestAnimationFrame(loopStars);
         };
 
         buildStars();
         if (REDUCE) {
-          drawStars();
+          drawStars(performance.now());
         } else {
-          loopStars();
+          starsRaf = requestAnimationFrame(loopStars);
         }
 
         const handleResizeStars = () => buildStars();
         const handleScrollStars = () => {
           yVal = window.scrollY;
-          if (REDUCE) drawStars();
+          if (REDUCE) drawStars(performance.now());
         };
 
         window.addEventListener('resize', handleResizeStars, { passive: true });
@@ -388,7 +406,7 @@ export default function Landing() {
     );
     root.querySelectorAll('[data-split],[data-reveal],.fade').forEach((el) => io.observe(el));
 
-    // 3. Scroll Choreography Engine
+    // 3. Optimized Scroll Engine
     const ticks: Array<() => void> = [];
     const measures: Array<() => void> = [];
     let pending = false;
@@ -467,7 +485,7 @@ export default function Landing() {
       tick();
     });
 
-    // Archetype slots spring entry & dynamic glow effect
+    // Archetype slots spring entry (Optimized 0.15 threshold, zero lag)
     const slots = Array.from(root.querySelectorAll('.card-slot')) as HTMLElement[];
 
     if (REDUCE) {
@@ -478,31 +496,15 @@ export default function Landing() {
           es.forEach((e) => {
             if (e.isIntersecting) {
               e.target.classList.add('on');
+              (e.target as HTMLElement).style.setProperty('--glow', '0.45');
               cio.unobserve(e.target);
             }
           });
         },
-        { threshold: 0.62 }
+        { threshold: 0.15 }
       );
       slots.forEach((s) => cio.observe(s));
     }
-
-    ticks.push(() => {
-      const vh = window.innerHeight,
-        mid = vh / 2;
-      for (const s of slots) {
-        const cardEl = s.querySelector('.card');
-        if (!cardEl) continue;
-        const r = cardEl.getBoundingClientRect();
-        if (r.bottom < -200 || r.top > vh + 200) {
-          s.style.setProperty('--glow', '0');
-          continue;
-        }
-        const d = Math.abs(r.top + r.height / 2 - mid) / vh;
-        const g = Math.max(0, 1 - d * 2.2);
-        s.style.setProperty('--glow', (g * g * 0.5).toFixed(3));
-      }
-    });
 
     remeasure();
     if (document.fonts) {
@@ -571,35 +573,39 @@ export default function Landing() {
 
   return (
     <div ref={rootRef}>
+      {/* ATMOSFERA */}
       <canvas id="stars" aria-hidden="true" />
       <div className="veil" aria-hidden="true" />
 
-      {/* HEADER NAV */}
+      {/* HEADER / NAV */}
       <header className="nav" id="nav">
         <a href="#top" className="brand">
           STAKEHOLDERS<i />
         </a>
-        <nav className="nav-links">
-          <a href="#pasos">Cómo funciona</a>
-          <a href="#arquetipos">Arquetipos</a>
-          <a href="#topes">Topes</a>
+        <nav className="nav-links" aria-label="Navegación principal">
+          <a href="#test-section">¿Declaro?</a>
+          <a href="#arquetipos">Los 6 Perfiles</a>
+          <a href="#topes">Topes DIAN</a>
+          <a href="#pasos">¿Cómo funciona?</a>
         </nav>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="nav-actions">
           <Link
             href="/admin/login"
             style={{
-              fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '.2em',
-              textTransform: 'uppercase', color: 'var(--dimmer)',
-              padding: '7px 12px', borderRadius: 999,
-              border: '1px solid rgba(255,255,255,0.10)',
-              transition: 'color .2s, border-color .2s',
+              fontFamily: 'var(--mono)',
+              fontSize: 11,
+              letterSpacing: '.14em',
+              textTransform: 'uppercase',
+              color: 'rgba(255,255,255,0.6)',
+              padding: '6px 12px',
+              borderRadius: 999,
+              border: '1px solid rgba(255,255,255,0.12)',
+              transition: 'all .2s',
             }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = 'var(--white)'; (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(255,255,255,0.30)'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = 'var(--dimmer)'; (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(255,255,255,0.10)'; }}
           >
             Login
           </Link>
-          <button className="pill" onClick={handleOpenAgendar}>
+          <button className="pill pill--blue" onClick={handleOpenAgendar} type="button">
             Agendar consulta
           </button>
         </div>
@@ -630,235 +636,245 @@ export default function Landing() {
                     autoComplete="off"
                     maxLength={2}
                     placeholder="45"
+                    aria-label="Dos últimos dígitos de tu cédula"
                     value={cedInput}
                     onChange={(e) => handleCedInput(e.target.value)}
-                    aria-describedby="out"
                   />
                   <div
                     className="finder__out"
-                    id="out"
-                    role="status"
+                    id="finder-out"
                     aria-live="polite"
                     dangerouslySetInnerHTML={{ __html: finderResult.html }}
                   />
                 </div>
-                <div className="finder__foot">
-                  <p>Cifras sujetas a validación de un contador del equipo</p>
+
+                <div className="hero__cta">
+                  <Link href="/test" className="pill pill--blue">
+                    Hacer el test →
+                  </Link>
+                  <button className="pill pill--ghost" onClick={handleOpenAgendar} type="button">
+                    Agendar consulta
+                  </button>
                 </div>
-              </div>
-              <div className="hero__cta fade" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                <Link href="/test" className="pill pill--blue">
-                  Hacer el test →
-                </Link>
-                <button className="pill pill--ghost" onClick={handleOpenAgendar}>
-                  Agendar consulta
-                </button>
               </div>
             </div>
           </div>
-          <p className="scroll-cue">Desliza para empezar</p>
         </section>
 
-        {/* TICKER MARQUEE */}
-        <div className="ticker" aria-hidden="true">
-          <div className="ticker__in" id="ticker">
-            <span>Patrimonio</span>
-            <span><b>·</b></span>
-            <span>Ingresos</span>
-            <span><b>·</b></span>
-            <span>Tarjeta de crédito</span>
-            <span><b>·</b></span>
-            <span>Consignaciones</span>
-            <span><b>·</b></span>
-            <span>Compras</span>
-            <span><b>·</b></span>
-            <span>Seis arquetipos</span>
-            <span><b>·</b></span>
-            <span>Un solo veredicto</span>
-            <span><b>·</b></span>
+        {/* TICKER DE IMPACTO */}
+        <div className="ticker-wrap" aria-hidden="true">
+          <div className="ticker" id="ticker">
+            <span>¿DEBES DECLARAR RENTA?</span>
+            <span>·</span>
+            <span>6 ARQUETIPOS DE COMPORTAMIENTO</span>
+            <span>·</span>
+            <span>EL DIAGNÓSTICO EN 3 MINUTOS</span>
+            <span>·</span>
+            <span>ESTRATEGIA ANTE LA DIAN</span>
+            <span>·</span>
           </div>
         </div>
 
-        {/* CÓMO FUNCIONA */}
-        <section className="hsec" id="pasos" data-h data-rate=".62" style={{ '--n': 5 } as React.CSSProperties}>
-          <div className="hsec__sticky">
-            <div className="hsec__head" data-reveal>
-              <h2 data-split data-tint="1">
-                Cómo funciona
-              </h2>
-              <p className="lead fade">
-                Todos tenemos a ese amigo que factura como rey pero vive como nómada, o al que no le queda un peso porque el sueldo se le va apagando incendios. Estilos de vida opuestos, mismo destino: a los dos probablemente les toca declarar.
-              </p>
-            </div>
-            <div className="hsec__body">
-              <div className="htrack">
-                <article className="step">
-                  <p className="step__n">01</p>
-                  <p>Entras y respondes un test corto sobre tu patrimonio, tus ingresos, tus créditos y tus movimientos.</p>
-                </article>
-                <article className="step">
-                  <p className="step__n">02</p>
-                  <p>El motor te compara con los cinco topes que la DIAN revisa cada año.</p>
-                </article>
-                <article className="step">
-                  <p className="step__n">03</p>
-                  <p>Descubres tu arquetipo: el personaje que mejor describe tu relación con el dinero.</p>
-                </article>
-                <article className="step">
-                  <p className="step__n">04</p>
-                  <p>Y el dato que de verdad importa: si te toca declarar, por qué tope, y hasta qué fecha tienes plazo.</p>
-                </article>
-                <article className="step step--cta">
-                  <p className="step__n">Empieza</p>
-                  <div>
-                    <p style={{ marginBottom: 18 }}>
-                      Responde el test, descubre tu arquetipo, y de paso descubre si este año te toca declarar renta con la fecha límite de presentar la declaración.
-                    </p>
-                    <a href="#arquetipos" className="pill">
-                      Descubre tu arquetipo
-                    </a>
-                  </div>
-                </article>
-              </div>
-            </div>
+        {/* SECCION 6 PERFILES ARQUETIPOS */}
+        <section className="section sec-arquetipos" id="arquetipos" data-reveal>
+          <div className="sec-head">
+            <p className="eyebrow">Diagnóstico de perfil</p>
+            <h2 data-split data-tint="2">
+              Los 6 rostros tributarios de Colombia. ¿Con cuál te identificas?
+            </h2>
+            <p className="lead fade">
+              Cada perfil revela cómo tus decisiones financieras pasadas dialogan con el estatuto tributario actual.
+            </p>
           </div>
-        </section>
 
-        {/* ARQUETIPOS DECK */}
-        <section className="arq" id="arquetipos">
-          <div className="arq__wrap">
-            <div className="arq__head" data-reveal>
-              <h2 data-split data-tint="1,2">
-                Los seis arquetipos
-              </h2>
-              <p className="lead fade">Seis arquetipos diferentes para seis perfiles tributarios diferentes.</p>
-            </div>
-            <div className="arq__deck" id="deck">
-              {ARCHETYPES.map((a, i) => (
-                <div
-                  key={a.n}
-                  className="card-slot"
-                  style={{
-                    '--hA': a.hA,
-                    '--hB': a.hB,
-                    '--accent': a.accent,
-                    '--c2': a.c2,
-                  } as React.CSSProperties}
+          <div className="cards-grid" id="cards-grid">
+            {ARCHETYPES.map((a, i) => (
+              <div key={a.n} className="card-slot" data-slot={i}>
+                <article
+                  className="card"
+                  data-card={i}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Ver detalles del arquetipo ${a.n}`}
+                  onClick={() => handleOpenCard(i)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleOpenCard(i);
+                    }
+                  }}
                 >
-                  <div className="splash" aria-hidden="true" />
-                  <div className="card" data-i={i}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={ASSET_BASE + a.img} alt={`Carta de ${a.n}`} loading="lazy" decoding="async" />
-                    <button
-                      type="button"
-                      className="card__hit"
-                      onClick={() => handleOpenCard(i)}
-                      aria-label={`Conocer más sobre ${a.n}`}
-                    />
-                    <span className="card__more">Clic para conocer más</span>
-                    <span className="card__name">{a.n}</span>
+                  <div className="card__inner">
+                    {/* FRENTE */}
+                    <div className="card__face card__face--front">
+                      <div className="card__media">
+                        <img
+                          src={ASSET_BASE + a.img}
+                          alt={a.n}
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      </div>
+                      <div className="card__content">
+                        <span className="card__role">PERFIL 0{i + 1}</span>
+                        <h3 className="card__title">{a.n}</h3>
+                        <p className="card__frase">{a.f}</p>
+                        <span className="card__tag">{a.v}</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                </article>
+              </div>
+            ))}
           </div>
         </section>
 
-        {/* TOPES */}
-        <section className="hsec" id="topes" data-h data-rate=".55" style={{ '--n': 6 } as React.CSSProperties}>
-          <div className="hsec__sticky">
-            <div className="hsec__head" data-reveal>
-              <h2 data-split data-tint="1,2">
-                Quiénes deben declarar
+        {/* SECCION HORIZONTAL: TOPES DIAN */}
+        <section
+          className="section section--h"
+          id="topes"
+          data-reveal
+          data-h
+          data-rate="0.55"
+          style={{ '--n': 3.4 } as React.CSSProperties}
+        >
+          <div className="hsticky">
+            <div className="sec-head sec-head--h">
+              <p className="eyebrow">Topes 2026 — UVT $49.799</p>
+              <h2 data-split data-tint="1">
+                Superar un solo tope obliga a declarar.
               </h2>
               <p className="lead fade">
-                No importa el arquetipo que seas: basta con tropezar en uno de estos cinco topes para que la DIAN te ponga la mano en el hombro.
+                Si durante el año grabado cumples con una sola de estas variables, la ley te exige presentar declaración de renta.
               </p>
             </div>
-            <div className="hsec__body">
-              <div className="htrack">
-                <article className="tope">
-                  <p className="tope__i">Tope 01</p>
-                  <p className="tope__c">Patrimonio bruto</p>
-                  <p className="tope__m">$224.095.500</p>
-                  <p className="tope__u">4.500 UVT</p>
-                </article>
-                <article className="tope">
-                  <p className="tope__i">Tope 02</p>
-                  <p className="tope__c">Ingresos brutos totales</p>
-                  <p className="tope__m">$69.718.600</p>
-                  <p className="tope__u">1.400 UVT</p>
-                </article>
-                <article className="tope">
-                  <p className="tope__i">Tope 03</p>
-                  <p className="tope__c">Consumos con tarjeta de crédito</p>
-                  <p className="tope__m">$69.718.600</p>
-                  <p className="tope__u">1.400 UVT</p>
-                </article>
-                <article className="tope">
-                  <p className="tope__i">Tope 04</p>
-                  <p className="tope__c">Consignaciones, depósitos o inversiones</p>
-                  <p className="tope__m">$69.718.600</p>
-                  <p className="tope__u">1.400 UVT</p>
-                </article>
-                <article className="tope">
-                  <p className="tope__i">Tope 05</p>
-                  <p className="tope__c">Compras y consumos</p>
-                  <p className="tope__m">$69.718.600</p>
-                  <p className="tope__u">1.400 UVT</p>
-                </article>
-                <article className="tope tope--cta">
-                  <p className="tope__i">Y entonces</p>
-                  <p className="tope__m" style={{ fontSize: 'clamp(1.9rem,7.4vw,3.4rem)', maxWidth: '15ch' }}>
-                    ¿Cruzaste alguno, o no estás seguro?
-                  </p>
-                  <p>
-                    <button className="pill" onClick={handleOpenAgendar} style={{ marginTop: 16 }}>
-                      Agendar una consultoría
-                    </button>
-                  </p>
-                </article>
-              </div>
-            </div>
+
             <div className="hprogress" aria-hidden="true">
               <i />
             </div>
+
+            <div className="htrack">
+              <div className="tope-card">
+                <span className="tope-card__num">01</span>
+                <h3>Patrimonio Bruto</h3>
+                <p className="tope-card__val">$224.095.500 COP</p>
+                <p className="tope-card__sub">4.500 UVT al cierre del año</p>
+                <p className="tope-card__desc">
+                  Suma total de tus bienes (propiedades, vehículos, cuentas, inversiones) sin restar deudas.
+                </p>
+              </div>
+
+              <div className="tope-card">
+                <span className="tope-card__num">02</span>
+                <h3>Ingresos Totales</h3>
+                <p className="tope-card__val">$69.718.600 COP</p>
+                <p className="tope-card__sub">1.400 UVT anuales (~$5,8M/mes)</p>
+                <p className="tope-card__desc">
+                  Ingresos recibidos por salarios, honorarios, arriendos, ventas o rendimientos financieros.
+                </p>
+              </div>
+
+              <div className="tope-card">
+                <span className="tope-card__num">03</span>
+                <h3>Consumos & Movimientos</h3>
+                <p className="tope-card__val">$69.718.600 COP</p>
+                <p className="tope-card__sub">1.400 UVT en tarjetas o consignaciones</p>
+                <p className="tope-card__desc">
+                  Pagos con tarjeta de crédito, compras acumuladas o total abonado en cuentas bancarias.
+                </p>
+              </div>
+            </div>
           </div>
         </section>
 
-        {/* OUTRO CIERRE */}
-        <section className="outro" id="agendar" data-reveal>
-          <h2 data-split data-tint="6,7">
-            Al final del camino te espera la DIAN
-          </h2>
-          <div className="outro__actions fade">
-            <Link href="/test" className="pill">
-              Hacer el test →
-            </Link>
-            <a href="#finder" className="pill pill--ghost">
-              Consultar mi fecha
-            </a>
+        {/* SECCION HORIZONTAL: COMO FUNCIONA */}
+        <section
+          className="section section--h"
+          id="pasos"
+          data-reveal
+          data-h
+          data-rate="0.58"
+          style={{ '--n': 4 } as React.CSSProperties}
+        >
+          <div className="hsticky">
+            <div className="sec-head sec-head--h">
+              <p className="eyebrow">Paso a paso</p>
+              <h2 data-split data-tint="1">
+                Tu diagnóstico tributario en 3 pasos.
+              </h2>
+            </div>
+
+            <div className="hprogress" aria-hidden="true">
+              <i />
+            </div>
+
+            <div className="htrack">
+              <div className="paso-card">
+                <span className="paso-card__num">Paso 01</span>
+                <h3>Responde el Cuestionario</h3>
+                <p className="paso-card__desc">
+                  Ingresa tus ingresos, patrimonio y hábitos financieros de forma 100% confidencial en solo 3 minutos.
+                </p>
+              </div>
+
+              <div className="paso-card">
+                <span className="paso-card__num">Paso 02</span>
+                <h3>Descubre tu Arquetipo</h3>
+                <p className="paso-card__desc">
+                  Nuestro algoritmo determina tu perfil financiero exacto, veredicto ante la DIAN y fecha límite de presentación.
+                </p>
+              </div>
+
+              <div className="paso-card">
+                <span className="paso-card__num">Paso 03</span>
+                <h3>Optimización con Contador</h3>
+                <p className="paso-card__desc">
+                  Programa tu consultoría personalizada para aplicar deducciones legales y presentar sin sanciones.
+                </p>
+              </div>
+            </div>
           </div>
-          <p className="dian" aria-hidden="true">
-            DIAN
-          </p>
+        </section>
+
+        {/* CTA FINAL */}
+        <section className="section sec-cta" data-reveal>
+          <div className="cta-box">
+            <p className="eyebrow">Diagnóstico Inmediato</p>
+            <h2 data-split data-tint="2">
+              Conoce tu situación tributaria en menos de 3 minutos.
+            </h2>
+            <p className="lead fade">
+              Sin costo inicial. Obtén la claridad que necesitas antes del vencimiento de tu plazo.
+            </p>
+            <div className="cta-box__actions fade">
+              <Link href="/test" className="pill pill--blue pill--lg">
+                Comenzar cuestionario gratis →
+              </Link>
+              <button className="pill pill--ghost pill--lg" onClick={handleOpenAgendar} type="button">
+                Agendar consultoría contable
+              </button>
+            </div>
+          </div>
         </section>
       </main>
 
       {/* FOOTER */}
       <footer className="foot">
-        <p>Estimación orientativa. No es asesoría tributaria. Stakeholders 2026.</p>
-        <nav>
-          <a href="#top">Consultar</a>
-          <button type="button" className="foot__link" onClick={handleOpenAgendar}>
-            Agendar
-          </button>
-        </nav>
+        <div className="foot__inner">
+          <div className="foot__brand">
+            <span>STAKEHOLDERS.</span>
+            <p>Estrategia tributaria y tecnológica para personas naturales en Colombia.</p>
+          </div>
+          <div className="foot__copy">
+            <p>© 2026 Stakeholders. Todos los derechos reservados.</p>
+            <p>Las fechas y topes corresponden a la normativa DIAN vigente para el año gravable 2025/2026.</p>
+          </div>
+        </div>
       </footer>
 
-      {/* MODAL REVERSO DE CARTA */}
+      {/* MODAL ARQUETIPO (CON INTRO VIDEO Y SKIP) */}
       <div
-        className={`modal ${modalOpen ? 'open' : ''} ${modalPlaying ? 'playing' : ''} ${modalReversed ? 'reversed' : ''}`}
+        className={`modal ${modalOpen ? 'open' : ''}`}
         id="modal"
         role="dialog"
         aria-modal="true"
@@ -866,36 +882,17 @@ export default function Landing() {
       >
         <div className="modal__bg" onClick={handleCloseCard} />
         {activeArchetype && (
-          <div
-            className="modal__card"
-            id="m-card"
-            style={{
-              '--accent': activeArchetype.accent,
-              '--c2': activeArchetype.c2,
-            } as React.CSSProperties}
-          >
-            <button className="modal__close" onClick={handleCloseCard} aria-label="Cerrar">
+          <div className={`modal__card ${modalReversed ? 'is-reversed' : ''}`}>
+            <button className="modal__close" onClick={handleCloseCard} aria-label="Cerrar modal">
               ✕
             </button>
 
-            {/* STAGE 1: VIDEO PRESENTATION */}
-            <div className="modal__stage" id="m-stage">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img id="m-poster" src={ASSET_BASE + activeArchetype.img} alt="" />
-              <video
-                ref={videoRef}
-                id="m-video"
-                playsInline
-                preload="auto"
-                onPlaying={() => setModalPlaying(true)}
-                onEnded={handleRevealInfo}
-                onError={handleRevealInfo}
-              />
-              <div className="modal__load" id="m-load">
-                <i aria-hidden="true" />
-                <span className="modal__loadtxt">Cargando presentación</span>
-                <button type="button" className="modal__skip" id="m-skip" onClick={handleRevealInfo}>
-                  Ver info
+            {/* STAGE 1: VIDEO INTRO OVERLAY */}
+            <div className={`modal__video-layer ${modalReversed ? 'hidden' : ''}`}>
+              <video ref={videoRef} playsInline onEnded={handleRevealInfo} />
+              <div className="modal__video-ctrls">
+                <button className="pill pill--ghost" onClick={handleRevealInfo} type="button">
+                  Ver perfil e información ↗
                 </button>
               </div>
             </div>
@@ -930,7 +927,7 @@ export default function Landing() {
         )}
       </div>
 
-      {/* MODAL AGENDAR CONSULTA */}
+      {/* MODAL AGENDAR CONSULTA — REESTRUCTURADO Y ORDENADO */}
       <div
         className={`sheet ${agendarOpen ? 'open' : ''}`}
         id="agendar-sheet"
@@ -947,23 +944,79 @@ export default function Landing() {
           {!agDoneTxt ? (
             <div className="sheet__body" id="ag-form">
               <p className="sheet__eyebrow">Stakeholders</p>
-              <h3 id="ag-title">Agendar consulta</h3>
-              <p className="sheet__sub">Déjanos tus datos y elige un horario. Un contador del equipo confirma contigo.</p>
+              <h3 id="ag-title">Agendar consulta contable</h3>
+              <p className="sheet__sub">Completa tus datos personales, elige el medio de contacto y la fecha de tu preferencia.</p>
 
+              {/* 1. Nombre completo */}
               <label className="fld">
-                <span>Nombre completo</span>
+                <span>1. Nombre completo</span>
                 <input
                   id="ag-nombre"
                   type="text"
                   autoComplete="name"
-                  placeholder="Tu nombre"
+                  placeholder="Ej. Juan Pérez"
                   value={agNombre}
                   onChange={(e) => setAgNombre(e.target.value)}
                 />
               </label>
 
+              {/* 2. Correo electrónico */}
+              <label className="fld">
+                <span>2. Correo electrónico</span>
+                <input
+                  id="ag-correo"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="tucorreo@ejemplo.com"
+                  value={agCorreo}
+                  onChange={(e) => setAgCorreo(e.target.value)}
+                />
+              </label>
+
+              {/* 3. Número de contacto */}
+              <label className="fld">
+                <span>3. Celular / WhatsApp</span>
+                <input
+                  id="ag-tel"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  placeholder="300 000 0000"
+                  value={agTel}
+                  onChange={(e) => setAgTel(e.target.value)}
+                />
+              </label>
+
+              {/* 4. Medio de Contacto Preferido */}
               <div className="fld">
-                <span>Fecha de la consulta</span>
+                <span>4. Medio de contacto preferido</span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 6 }}>
+                  {[
+                    { id: 'llamada', label: 'Llamada' },
+                    { id: 'videollamada', label: 'Videollamada' },
+                    { id: 'whatsapp', label: 'WhatsApp' },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setAgMedio(m.id as any)}
+                      style={{
+                        padding: '10px 8px', borderRadius: 10, fontSize: 12, fontFamily: 'var(--mono)',
+                        background: agMedio === m.id ? 'rgba(61,107,255,0.25)' : 'rgba(255,255,255,0.05)',
+                        border: agMedio === m.id ? '1px solid #3D6BFF' : '1px solid rgba(255,255,255,0.12)',
+                        color: agMedio === m.id ? '#7DD3FC' : '#FFFFFF', fontWeight: agMedio === m.id ? 700 : 400,
+                        cursor: 'pointer', transition: 'all .2s',
+                      }}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 5. Fecha de la consulta (Calendario) */}
+              <div className="fld">
+                <span>5. Selecciona la fecha de la consulta</span>
                 <div className="cal" id="ag-cal">
                   <div className="cal__nav">
                     <button
@@ -1010,9 +1063,10 @@ export default function Landing() {
                 </div>
               </div>
 
+              {/* 6. Hora */}
               {agDateSelected && getSlotsForDate(agDateSelected).length > 0 && (
                 <label className="fld" id="ag-hora-wrap">
-                  <span>Hora</span>
+                  <span>6. Hora de la cita</span>
                   <select
                     id="ag-hora"
                     value={agHoraSelected}
@@ -1026,31 +1080,6 @@ export default function Landing() {
                   </select>
                 </label>
               )}
-
-              <label className="fld">
-                <span>Correo</span>
-                <input
-                  id="ag-correo"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="tucorreo@ejemplo.com"
-                  value={agCorreo}
-                  onChange={(e) => setAgCorreo(e.target.value)}
-                />
-              </label>
-
-              <label className="fld">
-                <span>Número de contacto</span>
-                <input
-                  id="ag-tel"
-                  type="tel"
-                  inputMode="numeric"
-                  autoComplete="tel"
-                  placeholder="300 000 0000"
-                  value={agTel}
-                  onChange={(e) => setAgTel(e.target.value)}
-                />
-              </label>
 
               {agErr && (
                 <p className="fld__err" id="ag-err">
