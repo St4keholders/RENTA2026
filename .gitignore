@@ -33,6 +33,11 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# project plans and design drafts
+plan.md
+PLAN-NEXTJS-STAKEHOLDERS.md
+*.html
+
 # vercel
 .vercel
 
