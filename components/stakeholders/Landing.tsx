@@ -53,6 +53,7 @@ export default function Landing() {
   const [agNombre, setAgNombre] = useState('');
   const [agCorreo, setAgCorreo] = useState('');
   const [agTel, setAgTel] = useState('');
+  const [agMedio, setAgMedio] = useState<'llamada' | 'videollamada' | 'whatsapp'>('llamada');
   const [agDateSelected, setAgDateSelected] = useState<Date | null>(null);
   const [agHoraSelected, setAgHoraSelected] = useState('');
   const [agErr, setAgErr] = useState('');
@@ -128,6 +129,7 @@ export default function Landing() {
     setAgNombre('');
     setAgCorreo('');
     setAgTel('');
+    setAgMedio('llamada');
     setAgDateSelected(null);
     setAgHoraSelected('');
     setAgErr('');
@@ -210,6 +212,7 @@ export default function Landing() {
           celular: agTel,
           fecha: formattedDateStr,
           hora: agHoraSelected || '08:00',
+          medio_contacto: agMedio,
         }),
       });
 
@@ -985,6 +988,19 @@ export default function Landing() {
                   value={agTel}
                   onChange={(e) => setAgTel(e.target.value)}
                 />
+              </label>
+
+              <label className="fld">
+                <span>Método de contacto</span>
+                <select
+                  id="ag-medio"
+                  value={agMedio}
+                  onChange={(e) => setAgMedio(e.target.value as any)}
+                >
+                  <option value="llamada">Llamada</option>
+                  <option value="videollamada">Reunión virtual</option>
+                  <option value="whatsapp">WhatsApp</option>
+                </select>
               </label>
 
               <div className="fld">
