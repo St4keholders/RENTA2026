@@ -63,9 +63,22 @@ function AgendarContent() {
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Error al agendar cita');
+      // Redirigir al cobro de Wompi ($100.000 COP)
+      try {
+        const checkoutRes = await fetch('/api/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer_name: 'Cliente Renta',
+          }),
+        });
+        const checkoutData = await checkoutRes.json();
+        if (checkoutData.checkoutUrl) {
+          window.location.href = checkoutData.checkoutUrl;
+          return;
+        }
+      } catch (chkErr) {
+        console.error('Error al iniciar cobro Wompi:', chkErr);
       }
 
       setCompleted(true);

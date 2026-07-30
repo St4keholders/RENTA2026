@@ -218,17 +218,31 @@ export default function Landing() {
 
       const data = await res.json();
 
-      if (!res.ok || data.error) {
-        setAgErr(data.error || 'Ocurrió un error al agendar la consulta.');
-        setAgSubmitting(false);
-        return;
+      // Redirigir automáticamente al cobro de Wompi ($100.000 COP)
+      try {
+        const checkoutRes = await fetch('/api/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer_name: agNombre,
+            customer_email: agCorreo,
+            customer_phone: agTel,
+          }),
+        });
+        const dataCheckout = await checkoutRes.json();
+        if (dataCheckout.checkoutUrl) {
+          window.location.href = dataCheckout.checkoutUrl;
+          return;
+        }
+      } catch (chkErr) {
+        console.error('Error al iniciar pasarela de cobro:', chkErr);
       }
 
       const f = agDateSelected;
       const fechaTexto = `${f.getDate()} de ${MESES_NOMBRES[f.getMonth()]} de ${f.getFullYear()}`;
       const horaTexto = agHoraSelected ? ` a las ${agHoraSelected}` : '';
       setAgDoneTxt(
-        `Gracias, ${agNombre.trim().split(' ')[0]}. Te contactaremos para confirmar tu consulta del ${fechaTexto}${horaTexto}.`
+        `Gracias, ${agNombre.trim().split(' ')[0]}. Cita registrada. Redirigiendo al pago...`
       );
     } catch (err) {
       console.error('Error enviando cita:', err);
