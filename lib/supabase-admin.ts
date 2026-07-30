@@ -7,17 +7,18 @@ const SUPABASE_ANON_JWT =
 
 /**
  * Cliente server-side de Supabase.
- * Usa service_role para saltar RLS cuando la env var está configurada.
- * Si no hay service_role, usa el JWT anon (algunas operaciones pueden estar limitadas por RLS).
+ * Usa service_role para saltar RLS cuando está configurado.
+ * Si no hay service_role, usa el JWT anon legacy compatible con @supabase/supabase-js v2.
+ * NUNCA usa sb_publishable_* ya que ese formato no es compatible con la versión instalada.
  */
 export function supabaseAdmin() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || SUPABASE_URL;
-  const serviceKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    SUPABASE_ANON_JWT;
 
-  return createClient<Database>(url, serviceKey, {
+  // Solo usar service_role si existe y es un JWT válido
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  const key = serviceRoleKey.startsWith('eyJ') ? serviceRoleKey : SUPABASE_ANON_JWT;
+
+  return createClient<Database>(url, key, {
     auth: { persistSession: false },
   });
 }
