@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          id: boolean
+          pct_contador: number
+          pct_desarrollo: number
+          pct_ref_bajo: number
+          pct_ref_sobre: number
+          pct_vendedor: number
+          tope: number
+        }
+        Insert: {
+          id?: boolean
+          pct_contador?: number
+          pct_desarrollo?: number
+          pct_ref_bajo?: number
+          pct_ref_sobre?: number
+          pct_vendedor?: number
+          tope?: number
+        }
+        Update: {
+          id?: boolean
+          pct_contador?: number
+          pct_desarrollo?: number
+          pct_ref_bajo?: number
+          pct_ref_sobre?: number
+          pct_vendedor?: number
+          tope?: number
+        }
+        Relationships: []
+      }
       arquetipos: {
         Row: {
           descripcion: string | null
@@ -107,6 +137,60 @@ export type Database = {
         }
         Relationships: []
       }
+      commissions: {
+        Row: {
+          amount: number
+          base_amount: number
+          beneficiary_id: string
+          created_at: string
+          id: string
+          paid_at: string | null
+          pct: number
+          pipeline_lead_id: string
+          role: string
+          status: string
+        }
+        Insert: {
+          amount: number
+          base_amount: number
+          beneficiary_id: string
+          created_at?: string
+          id?: string
+          paid_at?: string | null
+          pct: number
+          pipeline_lead_id: string
+          role: string
+          status?: string
+        }
+        Update: {
+          amount?: number
+          base_amount?: number
+          beneficiary_id?: string
+          created_at?: string
+          id?: string
+          paid_at?: string | null
+          pct?: number
+          pipeline_lead_id?: string
+          role?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commissions_beneficiary_id_fkey"
+            columns: ["beneficiary_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commissions_pipeline_lead_id_fkey"
+            columns: ["pipeline_lead_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contadores: {
         Row: {
           activo: boolean
@@ -145,6 +229,58 @@ export type Database = {
           },
         ]
       }
+      lead_requests: {
+        Row: {
+          contador_id: string
+          id: string
+          pipeline_lead_id: string
+          requested_at: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+        }
+        Insert: {
+          contador_id: string
+          id?: string
+          pipeline_lead_id: string
+          requested_at?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Update: {
+          contador_id?: string
+          id?: string
+          pipeline_lead_id?: string
+          requested_at?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_requests_contador_id_fkey"
+            columns: ["contador_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_requests_pipeline_lead_id_fkey"
+            columns: ["pipeline_lead_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_requests_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           arquetipo_id: number | null
@@ -154,6 +290,8 @@ export type Database = {
           barra_patrimonio: number
           cedula: string
           celular: string | null
+          contador_id: string | null
+          correo: string | null
           created_at: string | null
           debe_declarar: boolean
           edad: number
@@ -175,6 +313,8 @@ export type Database = {
           barra_patrimonio: number
           cedula: string
           celular?: string | null
+          contador_id?: string | null
+          correo?: string | null
           created_at?: string | null
           debe_declarar: boolean
           edad: number
@@ -196,6 +336,8 @@ export type Database = {
           barra_patrimonio?: number
           cedula?: string
           celular?: string | null
+          contador_id?: string | null
+          correo?: string | null
           created_at?: string | null
           debe_declarar?: boolean
           edad?: number
@@ -215,6 +357,13 @@ export type Database = {
             columns: ["arquetipo_id"]
             isOneToOne: false
             referencedRelation: "arquetipos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_contador_id_fkey"
+            columns: ["contador_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
             referencedColumns: ["id"]
           },
         ]
@@ -270,6 +419,134 @@ export type Database = {
         }
         Relationships: []
       }
+      pipeline_leads: {
+        Row: {
+          anticipo_paid_at: string | null
+          assigned_contador_id: string | null
+          created_at: string
+          created_by: string | null
+          declaration_amount: number | null
+          email: string | null
+          full_name: string
+          id: string
+          phone: string | null
+          referrer_id: string | null
+          seller_id: string | null
+          source: string
+          stage: string
+          updated_at: string
+        }
+        Insert: {
+          anticipo_paid_at?: string | null
+          assigned_contador_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          declaration_amount?: number | null
+          email?: string | null
+          full_name: string
+          id?: string
+          phone?: string | null
+          referrer_id?: string | null
+          seller_id?: string | null
+          source?: string
+          stage?: string
+          updated_at?: string
+        }
+        Update: {
+          anticipo_paid_at?: string | null
+          assigned_contador_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          declaration_amount?: number | null
+          email?: string | null
+          full_name?: string
+          id?: string
+          phone?: string | null
+          referrer_id?: string | null
+          seller_id?: string | null
+          source?: string
+          stage?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_leads_assigned_contador_id_fkey"
+            columns: ["assigned_contador_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_leads_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_leads_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_leads_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referral_events: {
+        Row: {
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string
+          event_type: string
+          id: string
+          pipeline_lead_id: string | null
+          referrer_id: string
+        }
+        Insert: {
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          pipeline_lead_id?: string | null
+          referrer_id: string
+        }
+        Update: {
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          pipeline_lead_id?: string | null
+          referrer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_events_pipeline_lead_id_fkey"
+            columns: ["pipeline_lead_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_events_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       respuestas: {
         Row: {
           created_at: string | null
@@ -310,6 +587,12 @@ export type Database = {
           id: string
           nombre: string
           password_hash: string | null
+          payout_account_number: string | null
+          payout_account_type: string | null
+          payout_bank: string | null
+          payout_doc_id: string | null
+          phone: string | null
+          referral_slug: string | null
           rol: string
         }
         Insert: {
@@ -319,6 +602,12 @@ export type Database = {
           id?: string
           nombre: string
           password_hash?: string | null
+          payout_account_number?: string | null
+          payout_account_type?: string | null
+          payout_bank?: string | null
+          payout_doc_id?: string | null
+          phone?: string | null
+          referral_slug?: string | null
           rol?: string
         }
         Update: {
@@ -328,6 +617,12 @@ export type Database = {
           id?: string
           nombre?: string
           password_hash?: string | null
+          payout_account_number?: string | null
+          payout_account_type?: string | null
+          payout_bank?: string | null
+          payout_doc_id?: string | null
+          phone?: string | null
+          referral_slug?: string | null
           rol?: string
         }
         Relationships: []
@@ -400,7 +695,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_commissions: { Args: { p_lead_id: string }; Returns: undefined }
+      generate_referral_slug: { Args: { nombre: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
@@ -410,3 +706,126 @@ export type Database = {
     }
   }
 }
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {},
+  },
+} as const

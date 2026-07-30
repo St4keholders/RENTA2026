@@ -41,15 +41,19 @@ export async function POST(request: Request) {
   }
 }
 
-/* PATCH /api/admin/usuarios — update user (rol, activo, password) */
+/* PATCH /api/admin/usuarios — update user (rol, activo, password, payout data) */
 export async function PATCH(request: Request) {
   try {
-    const { id, rol, activo, password } = await request.json();
+    const { id, rol, activo, password, payout_bank, payout_account_type, payout_account_number, payout_doc_id } = await request.json();
     if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 });
     const updates: Record<string, unknown> = {};
     if (rol !== undefined) updates.rol = rol;
     if (activo !== undefined) updates.activo = activo;
     if (password) updates.password_hash = hashPwd(password);
+    if (payout_bank !== undefined) updates.payout_bank = payout_bank;
+    if (payout_account_type !== undefined) updates.payout_account_type = payout_account_type;
+    if (payout_account_number !== undefined) updates.payout_account_number = payout_account_number;
+    if (payout_doc_id !== undefined) updates.payout_doc_id = payout_doc_id;
     const supabase = await createClient();
     const { error } = await supabase.from('usuarios').update(updates as any).eq('id', id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

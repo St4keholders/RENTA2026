@@ -99,7 +99,7 @@ export default function AdminDashboardPage() {
   const [newUserNombre, setNewUserNombre] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
-  const [newUserRol, setNewUserRol] = useState<'desarrollador' | 'contador'>('contador');
+  const [newUserRol, setNewUserRol] = useState<'admin' | 'contador' | 'vendedor' | 'referido'>('contador');
   const [userMsg, setUserMsg] = useState<{ text: string; error?: boolean } | null>(null);
 
   /* Theme Tokens */
@@ -526,6 +526,21 @@ export default function AdminDashboardPage() {
                   {usuarios.length}
                 </span>
               </button>
+            )}
+
+            {isDev && (
+              <a
+                href="/admin/pipeline"
+                style={{
+                  width: '100%', padding: '12px 14px', borderRadius: 12, textAlign: 'left',
+                  fontFamily: 'var(--mono)', fontSize: 12, letterSpacing: '.16em', textTransform: 'uppercase',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', transition: 'all .2s',
+                  background: 'transparent', border: '1px solid transparent', color: t.subtext, textDecoration: 'none',
+                }}
+              >
+                PIPELINE
+                <span style={{ fontSize: 10, opacity: 0.7, background: isDark ? 'rgba(61,107,255,0.15)' : 'rgba(61,107,255,0.1)', padding: '2px 6px', borderRadius: 999, color: '#7DD3FC', border: '1px solid rgba(61,107,255,0.3)' }}>F2</span>
+              </a>
             )}
           </nav>
         </div>
@@ -974,11 +989,13 @@ export default function AdminDashboardPage() {
                   </label>
                   <select
                     value={newUserRol}
-                    onChange={(e) => setNewUserRol(e.target.value as 'desarrollador' | 'contador')}
+                    onChange={(e) => setNewUserRol(e.target.value as any)}
                     style={{ width: '100%', padding: '10px 14px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: 10, color: t.inputColor, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
                   >
-                    <option value="contador" style={{ background: t.modalBg, color: t.text }}>Contador (Solo ve su CRM)</option>
-                    <option value="desarrollador" style={{ background: t.modalBg, color: t.text }}>Desarrollador (Acceso total)</option>
+                    <option value="contador" style={{ background: t.modalBg, color: t.text }}>Contador (CRM + Pool de leads)</option>
+                    <option value="vendedor" style={{ background: t.modalBg, color: t.text }}>Vendedor (Clientes propios + Referidos)</option>
+                    <option value="referido" style={{ background: t.modalBg, color: t.text }}>Referido (Links + Ganancias)</option>
+                    <option value="admin" style={{ background: t.modalBg, color: t.text }}>Admin (Acceso total)</option>
                   </select>
                 </div>
 
