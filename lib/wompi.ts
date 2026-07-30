@@ -10,10 +10,10 @@ export interface WompiConfig {
 
 export function getWompiConfig(): WompiConfig {
   const env = (process.env.WOMPI_ENV || 'test') as 'test' | 'prod';
-  const publicKey = process.env.WOMPI_PUBLIC_KEY || '';
-  const privateKey = process.env.WOMPI_PRIVATE_KEY || '';
-  const integritySecret = process.env.WOMPI_INTEGRITY_SECRET || '';
-  const eventsSecret = process.env.WOMPI_EVENTS_SECRET || '';
+  const publicKey = process.env.WOMPI_PUBLIC_KEY || 'pub_test_ePMMHozTUkbqEJZEhEOy5dwPdG5Fz9OS';
+  const privateKey = process.env.WOMPI_PRIVATE_KEY || 'prv_test_oenUWghyDWPwxQRe0X3JIdTNGmIf6CPc';
+  const integritySecret = process.env.WOMPI_INTEGRITY_SECRET || 'test_integrity_bllnWEfC38sHDEBlTqVBDfHq6Bx63k8D';
+  const eventsSecret = process.env.WOMPI_EVENTS_SECRET || 'test_events_jmPRYmPLOuXvqWagim8zihjQU9poXh5p';
 
   return { env, publicKey, privateKey, integritySecret, eventsSecret };
 }
