@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { calcularResultado, RespuestasCuestionario } from '@/lib/motor';
 
 export async function POST(request: Request) {
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     // Calcular resultado con el motor
     const resultado = calcularResultado(payload);
 
-    const supabase = await createClient();
+    const supabase = supabaseAdmin();
 
     // Obtener ID de arquetipo en la BD
     const { data: arqData } = await supabase

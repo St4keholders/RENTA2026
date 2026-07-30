@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 /* GET /api/solicitudes — list lead requests */
 export async function GET() {
   try {
-    const supabase = await createClient();
+    const supabase = supabaseAdmin();
     const { data, error } = await supabase
       .from('lead_requests')
       .select(`
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     if (!pipeline_lead_id || !contador_id)
       return NextResponse.json({ error: 'Campos requeridos' }, { status: 400 });
 
-    const supabase = await createClient();
+    const supabase = supabaseAdmin();
     const { data, error } = await supabase
       .from('lead_requests')
       .insert({ pipeline_lead_id, contador_id })
@@ -52,7 +52,7 @@ export async function PATCH(request: Request) {
     if (!id || !status)
       return NextResponse.json({ error: 'ID y status requeridos' }, { status: 400 });
 
-    const supabase = await createClient();
+    const supabase = supabaseAdmin();
 
     // Update request status
     const { error: reqError } = await supabase

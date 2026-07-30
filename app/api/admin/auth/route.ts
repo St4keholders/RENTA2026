@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
-import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 function hashPwd(pwd: string) {
   return createHash('sha256').update(pwd + 'stakeholders2026').digest('hex');
@@ -12,7 +12,8 @@ export async function POST(request: Request) {
     const { email, password } = await request.json();
     if (!email || !password) return NextResponse.json({ error: 'Credenciales requeridas' }, { status: 400 });
 
-    const supabase = await createClient();
+    // Usamos supabaseAdmin para poder leer usuarios independientemente de RLS
+    const supabase = supabaseAdmin();
     const { data: user, error } = await supabase
       .from('usuarios')
       .select('id, nombre, email, rol, activo, password_hash')

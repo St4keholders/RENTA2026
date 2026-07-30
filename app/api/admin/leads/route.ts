@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 /* GET /api/admin/leads — list all leads with respuestas */
 export async function GET() {
   try {
-    const supabase = await createClient();
+    const supabase = supabaseAdmin();
 
     const { data: leads, error } = await supabase
       .from('leads')
@@ -45,7 +45,7 @@ export async function PATCH(request: Request) {
     if (estado !== undefined) updates.estado = estado;
     if (contador_id !== undefined) updates.contador_id = contador_id;
 
-    const supabase = await createClient();
+    const supabase = supabaseAdmin();
     const { error } = await supabase.from('leads').update(updates as any).eq('id', id);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -62,7 +62,7 @@ export async function DELETE(request: Request) {
     const { id } = await request.json();
     if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 });
 
-    const supabase = await createClient();
+    const supabase = supabaseAdmin();
     // Delete associated respuestas and ventas first if needed, or cascade
     await supabase.from('respuestas').delete().eq('lead_id', id);
     await supabase.from('ventas').delete().eq('lead_id', id);

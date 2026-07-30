@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import type { Database } from '@/lib/database.types';
 
 export async function GET() {
   try {
-    const supabase = await createClient();
+    const supabase = supabaseAdmin();
 
     const { data: ventas, error } = await supabase
       .from('ventas')
@@ -46,7 +46,7 @@ export async function PATCH(request: Request) {
     if (pago_confirmado !== undefined) updates.pago_confirmado = pago_confirmado;
     if (contador_id !== undefined) updates.contador_id = contador_id;
 
-    const supabase = await createClient();
+    const supabase = supabaseAdmin();
     const { error } = await supabase.from('ventas').update(updates).eq('id', id);
 
     if (error) {

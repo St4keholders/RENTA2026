@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 /* GET /api/referral-events — list events for a referrer */
 export async function GET(request: Request) {
@@ -7,7 +7,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const referrer_id = searchParams.get('referrer_id');
 
-    const supabase = await createClient();
+    const supabase = supabaseAdmin();
     let query = supabase
       .from('referral_events')
       .select(`
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     if (!referrer_slug || !event_type)
       return NextResponse.json({ error: 'Slug y tipo requeridos' }, { status: 400 });
 
-    const supabase = await createClient();
+    const supabase = supabaseAdmin();
 
     // Resolve slug → referrer_id
     const { data: user } = await supabase

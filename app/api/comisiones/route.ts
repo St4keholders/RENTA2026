@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 /* GET /api/comisiones — list commissions for admin or beneficiary */
 export async function GET(request: Request) {
@@ -7,7 +7,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const beneficiary_id = searchParams.get('beneficiary_id');
 
-    const supabase = await createClient();
+    const supabase = supabaseAdmin();
     let query = supabase
       .from('commissions')
       .select(`
@@ -34,7 +34,7 @@ export async function PATCH(request: Request) {
     const { id, status } = await request.json();
     if (!id || !status) return NextResponse.json({ error: 'ID y status requeridos' }, { status: 400 });
 
-    const supabase = await createClient();
+    const supabase = supabaseAdmin();
     const updates: Record<string, unknown> = { status };
     if (status === 'pagada') updates.paid_at = new Date().toISOString();
 

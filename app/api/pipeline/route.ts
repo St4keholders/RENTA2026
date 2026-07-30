@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 /* GET /api/pipeline — list pipeline_leads for admin */
 export async function GET() {
   try {
-    const supabase = await createClient();
+    const supabase = supabaseAdmin();
     const { data, error } = await supabase
       .from('pipeline_leads')
       .select(`
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     const { full_name, email, phone, seller_id, source = 'vendedor' } = body;
     if (!full_name) return NextResponse.json({ error: 'Nombre requerido' }, { status: 400 });
 
-    const supabase = await createClient();
+    const supabase = supabaseAdmin();
     const { data, error } = await supabase
       .from('pipeline_leads')
       .insert({ full_name, email, phone, seller_id, source, created_by: seller_id })
@@ -58,7 +58,7 @@ export async function PATCH(request: Request) {
     if (declaration_amount !== undefined) updates.declaration_amount = Number(declaration_amount);
     if (assigned_contador_id !== undefined) updates.assigned_contador_id = assigned_contador_id;
 
-    const supabase = await createClient();
+    const supabase = supabaseAdmin();
     const { error } = await supabase.from('pipeline_leads').update(updates as any).eq('id', id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ success: true });

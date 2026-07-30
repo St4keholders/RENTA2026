@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
-import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 function hashPwd(pwd: string) {
   return createHash('sha256').update(pwd + 'stakeholders2026').digest('hex');
@@ -9,7 +9,7 @@ function hashPwd(pwd: string) {
 /* GET /api/admin/usuarios — list all users */
 export async function GET() {
   try {
-    const supabase = await createClient();
+    const supabase = supabaseAdmin();
     const { data, error } = await supabase
       .from('usuarios')
       .select('id, nombre, email, rol, activo, created_at')
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     if (!nombre || !email || !password || !rol) {
       return NextResponse.json({ error: 'Todos los campos son obligatorios' }, { status: 400 });
     }
-    const supabase = await createClient();
+    const supabase = supabaseAdmin();
     const { data, error } = await supabase
       .from('usuarios')
       .insert({ nombre, email: email.toLowerCase().trim(), rol, activo: true, password_hash: hashPwd(password) })
@@ -54,7 +54,7 @@ export async function PATCH(request: Request) {
     if (payout_account_type !== undefined) updates.payout_account_type = payout_account_type;
     if (payout_account_number !== undefined) updates.payout_account_number = payout_account_number;
     if (payout_doc_id !== undefined) updates.payout_doc_id = payout_doc_id;
-    const supabase = await createClient();
+    const supabase = supabaseAdmin();
     const { error } = await supabase.from('usuarios').update(updates as any).eq('id', id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ success: true });
@@ -68,7 +68,7 @@ export async function DELETE(request: Request) {
   try {
     const { id } = await request.json();
     if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 });
-    const supabase = await createClient();
+    const supabase = supabaseAdmin();
     const { error } = await supabase.from('usuarios').update({ activo: false }).eq('id', id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ success: true });

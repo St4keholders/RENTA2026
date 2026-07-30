@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 /* GET /api/ajustes — get app settings */
 export async function GET() {
   try {
-    const supabase = await createClient();
+    const supabase = supabaseAdmin();
     const { data, error } = await supabase
       .from('app_settings')
       .select('*')
@@ -25,7 +25,7 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const { tope, pct_contador, pct_vendedor, pct_desarrollo, pct_ref_bajo, pct_ref_sobre } = body;
 
-    const supabase = await createClient();
+    const supabase = supabaseAdmin();
     const { error } = await supabase
       .from('app_settings')
       .update({ tope, pct_contador, pct_vendedor, pct_desarrollo, pct_ref_bajo, pct_ref_sobre } as any)
