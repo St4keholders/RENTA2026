@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     const supabase = await createClient();
 
     // 1. Insertar Cita
-    const { data: cita, error } = await supabase
+    const { error } = await supabase
       .from('citas')
       .insert({
         nombre: nombre.trim(),
@@ -26,9 +26,7 @@ export async function POST(request: Request) {
         hora_consulta: hora || 'Sin hora específica',
         medio_contacto: medio_contacto || 'llamada',
         estado: 'agendado',
-      })
-      .select('id')
-      .single();
+      });
 
     if (error) {
       console.error('Error al registrar cita en Supabase:', error);
@@ -114,7 +112,7 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ success: true, citaId: cita.id });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error en API agendar:', error);
     return NextResponse.json(

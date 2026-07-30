@@ -368,6 +368,51 @@ export type Database = {
           },
         ]
       }
+      orders: {
+        Row: {
+          amount_in_cents: number
+          created_at: string
+          currency: string
+          customer_email: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          id: string
+          payment_method_type: string | null
+          reference: string
+          status: string
+          updated_at: string
+          wompi_transaction_id: string | null
+        }
+        Insert: {
+          amount_in_cents: number
+          created_at?: string
+          currency?: string
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          id?: string
+          payment_method_type?: string | null
+          reference: string
+          status?: string
+          updated_at?: string
+          wompi_transaction_id?: string | null
+        }
+        Update: {
+          amount_in_cents?: number
+          created_at?: string
+          currency?: string
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          id?: string
+          payment_method_type?: string | null
+          reference?: string
+          status?: string
+          updated_at?: string
+          wompi_transaction_id?: string | null
+        }
+        Relationships: []
+      }
       parametros_fiscales: {
         Row: {
           anio_gravable: number
