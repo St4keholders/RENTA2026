@@ -10,32 +10,45 @@ export async function POST(request: Request) {
     const currency = 'COP';
     const reference = `RENTA-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
-    // 1. Guardar orden en estado PENDING usando service_role
-    const supabase = supabaseAdmin();
-    const { error: orderError } = await supabase
-      .from('orders')
-      .insert({
-        reference,
-        amount_in_cents: amountInCents,
-        currency,
-        customer_email: customer_email || null,
-        customer_name: customer_name || null,
-        customer_phone: customer_phone || null,
-        status: 'PENDING',
-      });
+    // 1. Intentar guardar orden en Supabase (no bloquea si falla)
+    try {
+      const supabase = supabaseAdmin();
+      const { error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          reference,
+          amount_in_cents: amountInCents,
+          currency,
+          customer_email: customer_email || null,
+          customer_name: customer_name || null,
+          customer_phone: customer_phone || null,
+          status: 'PENDING',
+        });
 
-    if (orderError) {
-      console.error('Error creando orden de pago en Supabase:', orderError);
-      return NextResponse.json({ error: 'Error al registrar orden de pago' }, { status: 500 });
+      if (orderError) {
+        // Solo loguear — no bloquear el checkout
+        console.warn('[checkout] No se pudo crear orden en Supabase:', orderError.message);
+      }
+    } catch (dbErr: any) {
+      console.warn('[checkout] Error de base de datos (no bloquea):', dbErr?.message);
     }
 
-    // 2. Generar firma de integridad Wompi
+    // 2. Siempre generar firma y URL de Wompi
     const signature = generateIntegritySignature(reference, amountInCents, currency);
     const { publicKey } = getWompiConfig();
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://rentash.vercel.app';
     const redirectUrl = `${siteUrl}/pagos/respuesta?reference=${reference}`;
-    const checkoutUrl = `https://checkout.wompi.co/p/?public-key=${publicKey}&currency=${currency}&amount-in-cents=${amountInCents}&reference=${reference}&signature:integrity=${signature}&redirect-url=${encodeURIComponent(redirectUrl)}`;
+    const checkoutUrl =
+      `https://checkout.wompi.co/p/` +
+      `?public-key=${publicKey}` +
+      `&currency=${currency}` +
+      `&amount-in-cents=${amountInCents}` +
+      `&reference=${reference}` +
+      `&signature:integrity=${signature}` +
+      `&redirect-url=${encodeURIComponent(redirectUrl)}`;
+
+    console.log('[checkout] URL generada OK →', checkoutUrl);
 
     return NextResponse.json({
       success: true,
@@ -48,7 +61,7 @@ export async function POST(request: Request) {
       checkoutUrl,
     });
   } catch (error: any) {
-    console.error('Error en API checkout:', error);
+    console.error('[checkout] Error fatal en API checkout:', error);
     return NextResponse.json({ error: error?.message || 'Error interno del servidor' }, { status: 500 });
   }
 }
