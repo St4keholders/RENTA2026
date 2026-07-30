@@ -1,35 +1,45 @@
 import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { createClient } from '@supabase/supabase-js';
 
 function hashPwd(pwd: string) {
   return createHash('sha256').update(pwd + 'stakeholders2026').digest('hex');
 }
 
-/* POST /api/admin/auth — login */
+const SUPABASE_URL = 'https://cllpslpejubqqdgnkisf.supabase.co';
+const SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsbHBzbHBlanVicXFkZ25raXNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NTAwNzgsImV4cCI6MjEwMDEyNjA3OH0.NWBADZJfBIP8XTG4iMMEDug43msf0OlZze7riBD-96s';
+
+/* POST /api/admin/auth — login via SECURITY DEFINER RPC (bypassa RLS) */
 export async function POST(request: Request) {
   try {
     const { email, password } = await request.json();
-    if (!email || !password) return NextResponse.json({ error: 'Credenciales requeridas' }, { status: 400 });
+    if (!email || !password)
+      return NextResponse.json({ error: 'Credenciales requeridas' }, { status: 400 });
 
-    // Usamos supabaseAdmin para poder leer usuarios independientemente de RLS
-    const supabase = supabaseAdmin();
-    const { data: user, error } = await supabase
-      .from('usuarios')
-      .select('id, nombre, email, rol, activo, password_hash')
-      .eq('email', email.toLowerCase().trim())
-      .single();
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || SUPABASE_ANON_KEY;
+    const supabase = createClient(url, anonKey, { auth: { persistSession: false } });
 
-    if (error || !user) return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 401 });
-    if (!user.activo) return NextResponse.json({ error: 'Usuario inactivo' }, { status: 403 });
-    if (user.password_hash !== hashPwd(password)) return NextResponse.json({ error: 'Contraseña incorrecta' }, { status: 401 });
-
-    return NextResponse.json({
-      success: true,
-      user: { id: user.id, nombre: user.nombre, email: user.email, rol: user.rol },
+    // Llama a la función SQL SECURITY DEFINER que bypassa RLS
+    const { data, error } = await supabase.rpc('authenticate_user', {
+      p_email: email.toLowerCase().trim(),
+      p_password_hash: hashPwd(password),
     });
+
+    if (error) {
+      console.error('[auth] RPC error:', error.message);
+      return NextResponse.json({ error: 'Error interno al autenticar' }, { status: 500 });
+    }
+
+    // La función SQL devuelve { error: "..." } o { success: true, user: {...} }
+    if (data?.error) {
+      return NextResponse.json({ error: data.error }, { status: 401 });
+    }
+
+    return NextResponse.json({ success: true, user: data.user });
   } catch (err) {
-    console.error('Auth error:', err);
+    console.error('[auth] Error:', err);
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
 }
