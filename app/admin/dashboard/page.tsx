@@ -139,7 +139,7 @@ export default function AdminDashboardPage() {
   const [editEstado, setEditEstado] = useState<'nuevo' | 'contactado' | 'agendado' | 'perdido'>('nuevo');
   const [editPagado, setEditPagado] = useState(false);
   const [editEtapa, setEditEtapa] = useState<'consultoria' | 'documentos' | 'anticipo' | 'declaracion' | 'entrega'>('consultoria');
-  const [editValorDeclaracion, setEditValorDeclaracion] = useState(400000);
+  const [editValorDeclaracion, setEditValorDeclaracion] = useState(0);
 
   /* Form Nuevo Usuario */
   const [newUserNombre, setNewUserNombre] = useState('');
@@ -375,6 +375,21 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleUpdateLeadValorDeclaracion = async (leadId: string, val: number) => {
+    try {
+      const res = await fetch('/api/admin/leads', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: leadId, valor_declaracion: val }),
+      });
+      if (res.ok) {
+        await loadData();
+      }
+    } catch (err) {
+      console.error('Error actualizando valor declaración:', err);
+    }
+  };
+
   const handleOpenEditLead = (lead: LeadData) => {
     setEditingLead(lead);
     setEditNombre(lead.nombre);
@@ -385,7 +400,7 @@ export default function AdminDashboardPage() {
     setEditEstado(lead.estado);
     setEditPagado(Boolean(lead.pagado));
     setEditEtapa(lead.etapa || 'consultoria');
-    setEditValorDeclaracion(lead.valor_declaracion || 400000);
+    setEditValorDeclaracion(lead.valor_declaracion || 0);
   };
 
   const handleSaveEditLead = async (e: React.FormEvent) => {
@@ -564,13 +579,13 @@ export default function AdminDashboardPage() {
                 color: activeTab === 'crm' ? t.text : t.subtext,
               }}
             >
-              CRM (PAGADOS)
+              CRM
               <span style={{ fontSize: 10, opacity: 0.7, background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)', padding: '2px 6px', borderRadius: 999 }}>
                 {crmLeads.length}
               </span>
             </button>
 
-            {/* 2. REPORTE DE VENTAS & FINANZAS (Para Todos los Roles) */}
+            {/* 2. VENTAS */}
             <button
               onClick={() => { setActiveTab('ventas'); setMobileMenuOpen(false); }}
               style={{
@@ -582,10 +597,10 @@ export default function AdminDashboardPage() {
                 color: activeTab === 'ventas' ? t.text : t.subtext,
               }}
             >
-              VENTAS &amp; FINANZAS
+              VENTAS
             </button>
 
-            {/* 3. MIS LINKS DE REFERIDO */}
+            {/* 3. REFERIDOS */}
             {(isReferido || isVendedor || isDevOrAdmin) && (
               <button
                 onClick={() => { setActiveTab('links'); setMobileMenuOpen(false); }}
@@ -598,11 +613,11 @@ export default function AdminDashboardPage() {
                   color: activeTab === 'links' ? t.text : t.subtext,
                 }}
               >
-                LINKS DE REFERIDO
+                REFERIDOS
               </button>
             )}
 
-            {/* 4. CALCULADORA DE COMISIONES (Para Todos) */}
+            {/* 4. MARGENES */}
             <button
               onClick={() => { setActiveTab('calculadora'); setMobileMenuOpen(false); }}
               style={{
@@ -614,10 +629,10 @@ export default function AdminDashboardPage() {
                 color: activeTab === 'calculadora' ? t.text : t.subtext,
               }}
             >
-              CALCULADORA
+              MARGENES
             </button>
 
-            {/* 5. USUARIOS (Solo Admin) */}
+            {/* 5. USUARIOS */}
             {isDevOrAdmin && (
               <button
                 onClick={() => { setActiveTab('usuarios'); setMobileMenuOpen(false); }}
@@ -637,7 +652,7 @@ export default function AdminDashboardPage() {
               </button>
             )}
 
-            {/* 6. TODOS LOS LEADS (Admins + Contadores) */}
+            {/* 6. LEADS */}
             {(isDevOrAdmin || isContador) && (
               <button
                 onClick={() => { setActiveTab('leads'); setMobileMenuOpen(false); }}
@@ -650,7 +665,7 @@ export default function AdminDashboardPage() {
                   color: activeTab === 'leads' ? t.text : t.subtext,
                 }}
               >
-                TODOS LOS LEADS
+                LEADS
                 <span style={{ fontSize: 10, opacity: 0.7, background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)', padding: '2px 6px', borderRadius: 999 }}>
                   {leads.length}
                 </span>
@@ -1078,11 +1093,37 @@ export default function AdminDashboardPage() {
                             <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: t.subtext }}>C.C. {v.cedula}</span>
                           </td>
 
-                          {/* Valor Declaración */}
+                          {/* Valor Declaración (Editable por Contador / Admin) */}
                           <td style={{ padding: '14px 16px', textAlign: 'left' }}>
-                            <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#38BDF8', display: 'block' }}>
-                              {formatCOP(v.valorDeclaracion)}
-                            </span>
+                            {isDevOrAdmin || isContador ? (
+                              <input
+                                type="number"
+                                key={`${v.id}-${v.valorDeclaracion}`}
+                                defaultValue={v.valorDeclaracion || ''}
+                                placeholder="$0 (Definir)"
+                                onBlur={(e) => {
+                                  const num = Number(e.target.value) || 0;
+                                  if (num !== v.valorDeclaracion) {
+                                    handleUpdateLeadValorDeclaracion(v.id, num);
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    (e.target as HTMLInputElement).blur();
+                                  }
+                                }}
+                                style={{
+                                  width: 120, padding: '6px 10px', borderRadius: 8,
+                                  background: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
+                                  border: `1px solid ${t.inputBorder}`, color: '#38BDF8',
+                                  fontFamily: 'monospace', fontWeight: 700, fontSize: 13, outline: 'none',
+                                }}
+                              />
+                            ) : (
+                              <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#38BDF8', display: 'block' }}>
+                                {formatCOP(v.valorDeclaracion)}
+                              </span>
+                            )}
                           </td>
 
                           {isDevOrAdmin ? (

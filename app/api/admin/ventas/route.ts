@@ -27,7 +27,7 @@ export async function GET() {
     let totalUtilidadPlataforma = 0;
 
     const desgloseVentas = (leads || []).map((lead) => {
-      const valorDeclaracion = Number(lead.valor_declaracion) || 400000;
+      const valorDeclaracion = Number(lead.valor_declaracion) || 0;
       const totalVentaCliente = valorDeclaracion;
 
       const hasRef = Boolean(lead.referrer_id);
