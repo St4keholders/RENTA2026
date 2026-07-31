@@ -6,6 +6,178 @@ import Link from 'next/link';
 import '@/app/stakeholders.css';
 import { setRefCookie } from '@/lib/referral';
 
+/* ── Componente de Calendario Interactivo ────────────────────────────────── */
+function CustomCalendar({
+  selectedDate,
+  onSelectDate,
+}: {
+  selectedDate: string;
+  onSelectDate: (dateStr: string) => void;
+}) {
+  const today = new Date();
+  const [currentYear, setCurrentYear] = useState(today.getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(today.getMonth()); // 0-indexed
+
+  const monthNames = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ];
+
+  const daysOfWeek = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
+  // Obtener primer día y total de días del mes actual
+  const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+  // En JavaScript getDay(): 0 = Domingo, 1 = Lunes. Queremos 0 = Lunes, 6 = Domingo
+  let startOffset = firstDayOfMonth.getDay() - 1;
+  if (startOffset < 0) startOffset = 6;
+
+  const prevMonth = () => {
+    if (currentMonth === 0) {
+      setCurrentMonth(11);
+      setCurrentYear((y) => y - 1);
+    } else {
+      setCurrentMonth((m) => m - 1);
+    }
+  };
+
+  const nextMonth = () => {
+    if (currentMonth === 11) {
+      setCurrentMonth(0);
+      setCurrentYear((y) => y + 1);
+    } else {
+      setCurrentMonth((m) => m + 1);
+    }
+  };
+
+  const isToday = (d: number) => {
+    return (
+      d === today.getDate() &&
+      currentMonth === today.getMonth() &&
+      currentYear === today.getFullYear()
+    );
+  };
+
+  const isPast = (d: number) => {
+    const checkDate = new Date(currentYear, currentMonth, d);
+    const startToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    return checkDate < startToday;
+  };
+
+  const isSunday = (d: number) => {
+    const checkDate = new Date(currentYear, currentMonth, d);
+    return checkDate.getDay() === 0; // 0 = Domingo
+  };
+
+  const formatDateStr = (d: number) => {
+    const mm = String(currentMonth + 1).padStart(2, '0');
+    const dd = String(d).padStart(2, '0');
+    return `${currentYear}-${mm}-${dd}`;
+  };
+
+  return (
+    <div style={{
+      background: 'rgba(255,255,255,0.04)', borderRadius: 16,
+      border: '1px solid rgba(255,255,255,0.08)', padding: 16,
+    }}>
+      {/* Header del mes */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <button
+          type="button"
+          onClick={prevMonth}
+          style={{
+            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 8, color: '#fff', padding: '4px 10px', cursor: 'pointer', fontSize: 13,
+          }}
+        >
+          ←
+        </button>
+        <span style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 14, color: '#FFFFFF' }}>
+          {monthNames[currentMonth]} {currentYear}
+        </span>
+        <button
+          type="button"
+          onClick={nextMonth}
+          style={{
+            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 8, color: '#fff', padding: '4px 10px', cursor: 'pointer', fontSize: 13,
+          }}
+        >
+          →
+        </button>
+      </div>
+
+      {/* Días de la semana */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, textAlign: 'center', marginBottom: 8 }}>
+        {daysOfWeek.map((day, idx) => (
+          <span key={day} style={{
+            fontSize: 10, fontFamily: 'var(--mono)', textTransform: 'uppercase',
+            color: idx === 6 ? '#FF8080' : 'rgba(255,255,255,0.4)', fontWeight: 600,
+          }}>
+            {day}
+          </span>
+        ))}
+      </div>
+
+      {/* Rejilla de días */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+        {/* Espacios vacíos del inicio del mes */}
+        {Array.from({ length: startOffset }).map((_, i) => (
+          <div key={`empty-${i}`} />
+        ))}
+
+        {/* Días del mes */}
+        {Array.from({ length: daysInMonth }).map((_, i) => {
+          const dayNum = i + 1;
+          const dateStr = formatDateStr(dayNum);
+          const selected = selectedDate === dateStr;
+          const disabled = isPast(dayNum) || isSunday(dayNum);
+          const sunday = isSunday(dayNum);
+
+          return (
+            <button
+              key={dayNum}
+              type="button"
+              disabled={disabled}
+              onClick={() => onSelectDate(dateStr)}
+              style={{
+                aspectRatio: '1', borderRadius: 10,
+                background: selected
+                  ? '#3D6BFF'
+                  : isToday(dayNum)
+                  ? 'rgba(61,107,255,0.2)'
+                  : sunday
+                  ? 'rgba(255,80,80,0.06)'
+                  : 'rgba(255,255,255,0.04)',
+                border: selected
+                  ? '1px solid #7DD3FC'
+                  : isToday(dayNum)
+                  ? '1px solid rgba(61,107,255,0.5)'
+                  : '1px solid transparent',
+                color: selected
+                  ? '#FFFFFF'
+                  : disabled
+                  ? 'rgba(255,255,255,0.2)'
+                  : '#FFFFFF',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                fontFamily: 'var(--mono)', fontSize: 12, fontWeight: selected || isToday(dayNum) ? 700 : 500,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                boxShadow: selected ? '0 0 12px rgba(61,107,255,0.6)' : 'none',
+                transition: 'all .15s', opacity: disabled ? 0.4 : 1,
+              }}
+            >
+              {dayNum}
+              {sunday && <span style={{ fontSize: 7, color: '#FF8080', textTransform: 'uppercase' }}>Cerrado</span>}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ── Main Agendar Component ─────────────────────────────────────────── */
 function AgendarContent() {
   const searchParams = useSearchParams();
   const leadSlug = searchParams.get('lead') || '';
@@ -13,8 +185,10 @@ function AgendarContent() {
   const [nombre, setNombre] = useState('');
   const [correo, setCorreo] = useState('');
   const [celular, setCelular] = useState('');
-  const [fecha, setFecha] = useState('');
-  const [hora, setHora] = useState('10:00');
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [fecha, setFecha] = useState(todayStr);
+  const [hora, setHora] = useState('08:00');
   const [medioContacto, setMedioContacto] = useState<'llamada' | 'videollamada' | 'whatsapp'>('whatsapp');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -25,10 +199,45 @@ function AgendarContent() {
     if (ref) setRefCookie(ref);
   }, [searchParams]);
 
+  // Generar franjas horarias según el día seleccionado:
+  // Lunes a Viernes: 8am a 4pm (08:00 - 16:00)
+  // Sábado: 8am a 2pm (08:00 - 14:00)
+  // Domingo: Cerrado (sin franjas)
+  const getAvailableSlots = (dateString: string) => {
+    if (!dateString) return [];
+    const dateObj = new Date(`${dateString}T12:00:00Z`);
+    const dayOfWeek = dateObj.getDay(); // 0 = Domingo, 6 = Sábado
+
+    if (dayOfWeek === 0) return []; // Domingo no atendemos
+
+    const endHour = dayOfWeek === 6 ? 14 : 16; // Sábado hasta 14:00, L-V hasta 16:00
+    const slots = [];
+    for (let h = 8; h <= endHour; h++) {
+      const hh = String(h).padStart(2, '0');
+      const label = h < 12 ? `${hh}:00 AM` : h === 12 ? '12:00 PM' : `${String(h - 12).padStart(2, '0')}:00 PM`;
+      slots.push({ value: `${hh}:00`, label });
+    }
+    return slots;
+  };
+
+  const availableSlots = getAvailableSlots(fecha);
+
+  // Asegurar que si la hora seleccionada no está disponible para el nuevo día, resetear a la primera
+  useEffect(() => {
+    if (availableSlots.length > 0 && !availableSlots.some((s) => s.value === hora)) {
+      setHora(availableSlots[0].value);
+    }
+  }, [fecha]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nombre.trim() || !celular.trim() || !fecha) {
-      setErrorMsg('Por favor completa todos los campos requeridos (nombre, celular y fecha)');
+      setErrorMsg('Por favor completa tu nombre, celular y fecha de cita');
+      return;
+    }
+
+    if (availableSlots.length === 0) {
+      setErrorMsg('Los domingos no atendemos. Selecciona un día entre Lunes y Sábado.');
       return;
     }
 
@@ -78,9 +287,9 @@ function AgendarContent() {
 
   return (
     <div style={{
-      maxWidth: 540, width: '100%', borderRadius: 24,
+      maxWidth: 580, width: '100%', borderRadius: 24,
       background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(24px)',
-      border: '1px solid rgba(255,255,255,0.08)', padding: 'clamp(24px, 5vw, 40px)',
+      border: '1px solid rgba(255,255,255,0.08)', padding: 'clamp(24px, 5vw, 36px)',
       boxShadow: '0 20px 50px rgba(0,0,0,0.6)', color: '#FFFFFF', position: 'relative', zIndex: 10,
     }}>
       {/* Badge */}
@@ -100,7 +309,7 @@ function AgendarContent() {
         Reserva tu Consultoría Contable
       </h1>
 
-      <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', margin: '0 0 24px', lineHeight: 1.5 }}>
+      <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', margin: '0 0 20px', lineHeight: 1.5 }}>
         1 hora de asesoría personalizada con un contador experto por <strong style={{ color: '#4ED6A1' }}>$100.000 COP</strong>. El monto pagado se abona al valor final de tu declaración.
       </p>
 
@@ -108,7 +317,7 @@ function AgendarContent() {
         <div style={{
           padding: '12px 16px', borderRadius: 12, background: 'rgba(255,80,80,0.12)',
           border: '1px solid rgba(255,80,80,0.3)', color: '#FF8080', fontSize: 12,
-          fontFamily: 'var(--mono)', marginBottom: 20,
+          fontFamily: 'var(--mono)', marginBottom: 18,
         }}>
           ⚠️ {errorMsg}
         </div>
@@ -130,7 +339,6 @@ function AgendarContent() {
               width: '100%', padding: '12px 14px', borderRadius: 12,
               background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
               color: '#FFFFFF', fontSize: 14, fontFamily: 'var(--body)', outline: 'none',
-              transition: 'border .2s',
             }}
           />
         </div>
@@ -172,46 +380,52 @@ function AgendarContent() {
           </div>
         </div>
 
-        {/* Fecha y Hora */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div>
-            <label style={{ display: 'block', fontSize: 10, fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '.14em', color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>
-              Fecha de la Cita *
-            </label>
-            <input
-              type="date"
-              required
-              min={new Date().toISOString().split('T')[0]}
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
-              style={{
-                width: '100%', padding: '12px 14px', borderRadius: 12,
-                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
-                color: '#FFFFFF', fontSize: 13, fontFamily: 'var(--mono)', outline: 'none',
-                colorScheme: 'dark',
-              }}
-            />
-          </div>
+        {/* CALENDARIO INTERACTIVO VISUAL */}
+        <div>
+          <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '.14em', color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>
+            <span>Selecciona la Fecha de la Cita *</span>
+            <span style={{ color: '#4ED6A1' }}>L-V: 8am-4pm | Sáb: 8am-2pm</span>
+          </label>
+          <CustomCalendar selectedDate={fecha} onSelectDate={setFecha} />
+        </div>
 
-          <div>
-            <label style={{ display: 'block', fontSize: 10, fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '.14em', color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>
-              Hora Preferida
-            </label>
-            <select
-              value={hora}
-              onChange={(e) => setHora(e.target.value)}
-              style={{
-                width: '100%', padding: '12px 14px', borderRadius: 12,
-                background: '#121218', border: '1px solid rgba(255,255,255,0.12)',
-                color: '#FFFFFF', fontSize: 13, fontFamily: 'var(--mono)', outline: 'none',
-              }}
-            >
-              <option value="08:00">08:00 AM</option>
-              <option value="10:00">10:00 AM</option>
-              <option value="14:00">02:00 PM</option>
-              <option value="16:00">04:00 PM</option>
-            </select>
-          </div>
+        {/* FRANJAS HORARIAS DISPONIBLES */}
+        <div>
+          <label style={{ display: 'block', fontSize: 10, fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '.14em', color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>
+            Hora de Atención Disponible
+          </label>
+          {availableSlots.length === 0 ? (
+            <div style={{
+              padding: '12px', borderRadius: 12, background: 'rgba(255,80,80,0.1)',
+              border: '1px solid rgba(255,80,80,0.25)', color: '#FF8080', fontSize: 12, textAlign: 'center',
+            }}>
+              🚫 Los domingos no atendemos. Selecciona un día entre Lunes y Sábado.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8 }}>
+              {availableSlots.map((slot) => {
+                const active = hora === slot.value;
+                return (
+                  <button
+                    key={slot.value}
+                    type="button"
+                    onClick={() => setHora(slot.value)}
+                    style={{
+                      padding: '8px 10px', borderRadius: 10, cursor: 'pointer', textAlign: 'center',
+                      background: active ? '#4ED6A1' : 'rgba(255,255,255,0.04)',
+                      border: active ? '1px solid #7DD3FC' : '1px solid rgba(255,255,255,0.08)',
+                      color: active ? '#000000' : 'rgba(255,255,255,0.85)',
+                      fontFamily: 'var(--mono)', fontSize: 11, fontWeight: active ? 700 : 500,
+                      boxShadow: active ? '0 0 12px rgba(78,214,161,0.5)' : 'none',
+                      transition: 'all .15s',
+                    }}
+                  >
+                    {slot.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Medio de Contacto */}
@@ -264,12 +478,12 @@ function AgendarContent() {
         {/* Submit */}
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || availableSlots.length === 0}
           style={{
             width: '100%', padding: '15px', borderRadius: 14,
-            background: loading ? 'rgba(61,107,255,0.4)' : 'linear-gradient(135deg, #3D6BFF, #6B8FFF)',
+            background: loading || availableSlots.length === 0 ? 'rgba(61,107,255,0.4)' : 'linear-gradient(135deg, #3D6BFF, #6B8FFF)',
             color: '#FFFFFF', border: 'none', fontWeight: 700, fontSize: 15,
-            fontFamily: 'var(--display)', cursor: loading ? 'not-allowed' : 'pointer',
+            fontFamily: 'var(--display)', cursor: loading || availableSlots.length === 0 ? 'not-allowed' : 'pointer',
             boxShadow: '0 6px 30px -4px rgba(61,107,255,0.5)', transition: 'transform .15s',
             marginTop: 6,
           }}
@@ -284,7 +498,6 @@ function AgendarContent() {
 export default function AgendarPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Background stars effect
   useEffect(() => {
     const cv = canvasRef.current;
     if (!cv) return;
@@ -292,7 +505,7 @@ export default function AgendarPage() {
     if (!ctx) return;
 
     let stars: Array<{ x: number; y: number; r: number; a: number }> = [];
-    let w = 0, h = 0, raf: number | null = null;
+    let w = 0, h = 0;
 
     const build = () => {
       w = window.innerWidth; h = window.innerHeight;
