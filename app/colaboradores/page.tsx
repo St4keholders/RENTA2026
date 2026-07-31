@@ -445,10 +445,84 @@ export default function ColaboradoresPage() {
     return { amt: Math.round((sliderVal * totalPct) / 100), sub: `${totalPct}% de esta declaración` };
   };
 
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Animación del Canvas de Estrellas (Idéntico a la Landing)
+  useEffect(() => {
+    const cv = canvasRef.current;
+    if (!cv) return;
+    const ctx = cv.getContext('2d');
+    if (!ctx) return;
+
+    let stars: Array<{ x: number; y: number; r: number; a: number; s: number; t: number }> = [];
+    let w = 0, h = 0, dpr = 1;
+    let starsRaf: number | null = null;
+
+    const buildStars = () => {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      w = window.innerWidth;
+      h = window.innerHeight;
+      cv.width = w * dpr;
+      cv.height = h * dpr;
+      cv.style.width = w + 'px';
+      cv.style.height = h + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const n = Math.round((w * h) / 12000);
+      stars = Array.from({ length: Math.min(n, 260) }, () => ({
+        x: Math.random() * w,
+        y: Math.random() * h * 1.6 - h * 0.3,
+        r: Math.random() < 0.88 ? Math.random() * 0.7 + 0.25 : Math.random() * 1.1 + 0.8,
+        a: Math.random() * 0.45 + 0.08,
+        s: Math.random() * 0.55 + 0.12,
+        t: Math.random() * Math.PI * 2,
+      }));
+    };
+
+    let yVal = typeof window !== 'undefined' ? window.scrollY : 0;
+    const drawStars = () => {
+      ctx.clearRect(0, 0, w, h);
+      const time = performance.now() / 2600;
+      for (const st of stars) {
+        let py = st.y - yVal * st.s * 0.16;
+        py = (((py % (h * 1.6)) + h * 1.6) % (h * 1.6)) - h * 0.3;
+        const tw = 0.7 + 0.3 * Math.sin(time + st.t);
+        ctx.globalAlpha = st.a * tw;
+        ctx.fillStyle = st.r > 0.9 ? '#BFD4FF' : '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(st.x, py, st.r, 0, 6.283);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    };
+
+    const loopStars = () => {
+      drawStars();
+      starsRaf = requestAnimationFrame(loopStars);
+    };
+
+    buildStars();
+    loopStars();
+
+    const handleResize = () => buildStars();
+    const handleScroll = () => { yVal = window.scrollY; };
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      if (starsRaf) cancelAnimationFrame(starsRaf);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
   const currentComm = calculateRoleCommission();
 
   return (
     <div style={{ minHeight: '100vh', background: '#000000', color: '#FFFFFF', position: 'relative', overflowX: 'hidden' }}>
+      {/* Canvas de Estrellas del Fondo */}
+      <canvas ref={canvasRef} id="stars" aria-hidden="true" style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }} />
+
       {/* Atmósfera Cósmica Idéntica a la Landing Page */}
       <div className="veil" />
 
