@@ -171,12 +171,13 @@ export default function AdminDashboardPage() {
           setActiveTab('crm');
         }
       } catch {
-        const demo: UserSession = { id: 'admin-dev', nombre: 'Desarrollador Admin', email: 'admin@stakeholders.co', rol: 'desarrollador' };
-        setCurrentUser(demo);
+        // Sesión corrupta → limpiar y redirigir al login
+        localStorage.removeItem('stakeholders_user');
+        router.replace('/admin/login');
       }
     } else {
-      const demo: UserSession = { id: 'admin-dev', nombre: 'Desarrollador Admin', email: 'admin@stakeholders.co', rol: 'desarrollador' };
-      setCurrentUser(demo);
+      // Sin sesión → ir al login sin dejar el dashboard en el historial
+      router.replace('/admin/login');
     }
   }, []);
 
@@ -382,7 +383,8 @@ export default function AdminDashboardPage() {
 
   const handleLogout = () => {
     localStorage.removeItem('stakeholders_user');
-    router.push('/admin/login');
+    // Usar replace para eliminar el dashboard del historial (evita que el botón Atrás lo muestre)
+    router.replace('/');
   };
 
   /* Filter Logic */
