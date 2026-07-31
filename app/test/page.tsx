@@ -207,8 +207,9 @@ function TestContent() {
   const handleSubmit = async () => {
     setLoading(true); setErrorMsg('');
     try {
-      // Incluir ref slug para atribución de referido en el backend
-      const body = { ...form, ...(refSlug ? { ref: refSlug } : {}) };
+      // Incluir ref slug para atribución de referido en el backend (searchParams -> state -> cookie)
+      const currentRef = searchParams.get('ref') || refSlug || (typeof document !== 'undefined' ? (document.cookie.match(/(?:^|; )rentash_ref=([^;]*)/)?.[1] ? decodeURIComponent(document.cookie.match(/(?:^|; )rentash_ref=([^;]*)/)![1]) : null) : null);
+      const body = { ...form, ...(currentRef ? { ref: currentRef } : {}) };
       const res = await fetch('/api/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al procesar el cuestionario');

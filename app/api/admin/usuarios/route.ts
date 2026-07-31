@@ -12,7 +12,7 @@ export async function GET() {
     const supabase = supabaseAdmin();
     const { data, error } = await supabase
       .from('usuarios')
-      .select('id, nombre, email, rol, activo, created_at')
+      .select('id, nombre, email, rol, activo, created_at, referral_slug')
       .order('created_at', { ascending: false });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ usuarios: data || [] });
@@ -29,10 +29,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Todos los campos son obligatorios' }, { status: 400 });
     }
     const supabase = supabaseAdmin();
+    const referralSlug = nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+
     const { data, error } = await supabase
       .from('usuarios')
-      .insert({ nombre, email: email.toLowerCase().trim(), rol, activo: true, password_hash: hashPwd(password) })
-      .select('id, nombre, email, rol, activo, created_at')
+      .insert({
+        nombre,
+        email: email.toLowerCase().trim(),
+        rol,
+        activo: true,
+        password_hash: hashPwd(password),
+        referral_slug: referralSlug,
+      })
+      .select('id, nombre, email, rol, activo, created_at, referral_slug')
       .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ usuario: data });

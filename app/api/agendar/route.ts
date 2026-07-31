@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { resolveReferrer } from '@/lib/resolveReferrer';
 
 export async function POST(request: Request) {
   try {
@@ -61,16 +62,16 @@ export async function POST(request: Request) {
 
     // 3. Revisar cookie de referido para atribución First-Touch
     let referrerId: string | null = null;
+    let referrerRol: string | null = null;
     try {
       const cookieStore = await cookies();
       const refSlug = cookieStore.get('rentash_ref')?.value;
       if (refSlug) {
-        const { data: refUser } = await supabase
-          .from('usuarios')
-          .select('id')
-          .eq('referral_slug', refSlug)
-          .single();
-        if (refUser) referrerId = refUser.id;
+        const resolved = await resolveReferrer(refSlug);
+        if (resolved) {
+          referrerId = resolved.id;
+          referrerRol = resolved.rol;
+        }
       }
     } catch (e) {
       console.error('Error al verificar cookie de referido:', e);

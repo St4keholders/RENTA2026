@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { calcularResultado, RespuestasCuestionario } from '@/lib/motor';
+import { resolveReferrer } from '@/lib/resolveReferrer';
 
 export async function POST(request: Request) {
   try {
@@ -24,22 +25,19 @@ export async function POST(request: Request) {
 
     const arquetipoId = arqData?.id ?? null;
 
-    // 1. Resolver referrer_id desde el slug de referido (pasado por el cliente)
+    // 1. Resolver referrer_id desde el slug de referido (pasado por el cliente o cookie)
     let referrerId: string | null = null;
     let referrerRol: string | null = null;
-    if (payload.ref) {
-      try {
-        const { data: refUser } = await supabase
-          .from('usuarios')
-          .select('id, rol')
-          .eq('referral_slug', payload.ref)
-          .single();
-        if (refUser) {
-          referrerId = refUser.id;
-          referrerRol = refUser.rol;
-        }
-      } catch (e) {
-        console.error('[api/leads] Error resolviendo referral slug:', e);
+    const refToResolve = payload.ref || (request.headers.get('cookie')?.match(/(?:^|; )rentash_ref=([^;]*)/)?.[1] ? decodeURIComponent(request.headers.get('cookie')!.match(/(?:^|; )rentash_ref=([^;]*)/)![1]) : null);
+
+    if (refToResolve) {
+      const resolved = await resolveReferrer(refToResolve);
+      if (resolved) {
+        referrerId = resolved.id;
+        referrerRol = resolved.rol;
+        console.log(`✅ Referido resuelto: ${refToResolve} → ID: ${referrerId} (Rol: ${referrerRol})`);
+      } else {
+        console.warn(`⚠️ No se encontró usuario para referral slug: "${refToResolve}"`);
       }
     }
 

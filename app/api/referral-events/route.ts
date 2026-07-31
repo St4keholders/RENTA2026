@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { resolveReferrer } from '@/lib/resolveReferrer';
 
 /* GET /api/referral-events — list events for a referrer */
 export async function GET(request: Request) {
@@ -39,12 +40,7 @@ export async function POST(request: Request) {
     const supabase = supabaseAdmin();
 
     // Resolve slug → referrer_id
-    const { data: user } = await supabase
-      .from('usuarios')
-      .select('id')
-      .eq('referral_slug', referrer_slug)
-      .single();
-
+    const user = await resolveReferrer(referrer_slug);
     if (!user) return NextResponse.json({ error: 'Referido no encontrado' }, { status: 404 });
 
     const { data, error } = await supabase
