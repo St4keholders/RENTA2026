@@ -1036,23 +1036,23 @@ export default function AdminDashboardPage() {
                 {isDevOrAdmin ? 'Desglose Financiero por Cliente Confirmado' : 'Mis Clientes y Comisiones Asignadas'}
               </div>
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, tableLayout: 'fixed' }}>
                   <thead>
-                    <tr style={{ background: t.tableHeaderBg, borderBottom: `1px solid ${t.border}`, fontFamily: 'var(--mono)', textTransform: 'uppercase', color: t.tableHeaderColor }}>
-                      <th style={{ padding: '12px 16px' }}>Cliente</th>
-                      <th style={{ padding: '12px 16px' }}>Venta Total</th>
+                    <tr style={{ background: t.tableHeaderBg, borderBottom: `1px solid ${t.border}`, fontFamily: 'var(--mono)', textTransform: 'uppercase', color: t.tableHeaderColor, fontSize: 10, letterSpacing: '.08em' }}>
+                      <th style={{ padding: '14px 16px', textAlign: 'left', width: '18%' }}>Cliente</th>
+                      <th style={{ padding: '14px 16px', textAlign: 'left', width: '12%' }}>Venta Total</th>
                       {isDevOrAdmin ? (
                         <>
-                          <th style={{ padding: '12px 16px' }}>Comisión Contador</th>
-                          <th style={{ padding: '12px 16px' }}>Comisión Vendedor</th>
-                          <th style={{ padding: '12px 16px' }}>Comisión Referido</th>
-                          <th style={{ padding: '12px 16px' }}>Desarrollo (5%)</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'right' }}>Utilidad Plataforma</th>
+                          <th style={{ padding: '14px 16px', textAlign: 'left', width: '15%' }}>Contador (70%)</th>
+                          <th style={{ padding: '14px 16px', textAlign: 'left', width: '15%' }}>Vendedor (15%)</th>
+                          <th style={{ padding: '14px 16px', textAlign: 'left', width: '14%' }}>Referido (5%)</th>
+                          <th style={{ padding: '14px 16px', textAlign: 'left', width: '16%' }}>Desarrollo &amp; Mantenimiento (10%)</th>
+                          <th style={{ padding: '14px 16px', textAlign: 'right', width: '10%' }}>Acciones</th>
                         </>
                       ) : (
                         <>
-                          <th style={{ padding: '12px 16px' }}>Valor Declaración</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'right' }}>Mi Comisión Ganada</th>
+                          <th style={{ padding: '14px 16px', textAlign: 'left', width: '35%' }}>Valor Declaración</th>
+                          <th style={{ padding: '14px 16px', textAlign: 'right', width: '35%' }}>Mi Comisión Ganada</th>
                         </>
                       )}
                     </tr>
@@ -1067,22 +1067,82 @@ export default function AdminDashboardPage() {
                         ? v.amtReferido
                         : v.amtContador;
 
+                      const originalLead = leads.find((l) => l.id === v.id);
+
                       return (
                         <tr key={v.id} style={{ borderBottom: `1px solid ${t.tableRowBorder}` }}>
-                          <td style={{ padding: '12px 16px', fontWeight: 600 }}>{v.nombre}</td>
-                          <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#38BDF8' }}>{formatCOP(v.totalVentaCliente)}</td>
+                          {/* Cliente */}
+                          <td style={{ padding: '14px 16px', textAlign: 'left' }}>
+                            <span style={{ fontWeight: 700, color: t.text, display: 'block' }}>{v.nombre}</span>
+                            <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: t.subtext }}>C.C. {v.cedula}</span>
+                          </td>
+
+                          {/* Venta Total */}
+                          <td style={{ padding: '14px 16px', textAlign: 'left' }}>
+                            <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#38BDF8', display: 'block' }}>
+                              {formatCOP(v.totalVentaCliente)}
+                            </span>
+                            <span style={{ fontSize: 10, color: t.subtext }}>Decl: {formatCOP(v.valorDeclaracion)}</span>
+                          </td>
+
                           {isDevOrAdmin ? (
                             <>
-                              <td style={{ padding: '12px 16px', fontFamily: 'monospace' }}>{formatCOP(v.amtContador)} ({v.contadorNombre})</td>
-                              <td style={{ padding: '12px 16px', fontFamily: 'monospace' }}>{formatCOP(v.amtVendedor)} ({v.vendedorNombre})</td>
-                              <td style={{ padding: '12px 16px', fontFamily: 'monospace' }}>{formatCOP(v.amtReferido)} ({v.referidoNombre})</td>
-                              <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#C084FC' }}>{formatCOP(v.amtDesarrollo)}</td>
-                              <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#4ED6A1', textAlign: 'right', fontWeight: 700 }}>{formatCOP(v.amtPlataforma)}</td>
+                              {/* Contador */}
+                              <td style={{ padding: '14px 16px', textAlign: 'left' }}>
+                                <span style={{ fontFamily: 'monospace', fontWeight: 700, color: t.text, display: 'block' }}>
+                                  {formatCOP(v.amtContador)}
+                                </span>
+                                <span style={{ fontSize: 10, color: t.subtext }}>{v.contadorNombre}</span>
+                              </td>
+
+                              {/* Vendedor */}
+                              <td style={{ padding: '14px 16px', textAlign: 'left' }}>
+                                <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#FBBF24', display: 'block' }}>
+                                  {formatCOP(v.amtVendedor)}
+                                </span>
+                                <span style={{ fontSize: 10, color: t.subtext }}>{v.vendedorNombre}</span>
+                              </td>
+
+                              {/* Referido */}
+                              <td style={{ padding: '14px 16px', textAlign: 'left' }}>
+                                <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#4ED6A1', display: 'block' }}>
+                                  {formatCOP(v.amtReferido)}
+                                </span>
+                                <span style={{ fontSize: 10, color: t.subtext }}>{v.referidoNombre}</span>
+                              </td>
+
+                              {/* Desarrollo & Mantenimiento */}
+                              <td style={{ padding: '14px 16px', textAlign: 'left' }}>
+                                <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#C084FC', display: 'block' }}>
+                                  {formatCOP(v.amtDesarrollo)}
+                                </span>
+                                <span style={{ fontSize: 10, color: t.subtext }}>Plataforma: {formatCOP(v.amtPlataforma)}</span>
+                              </td>
+
+                              {/* Acciones */}
+                              <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                                {originalLead && (
+                                  <button
+                                    onClick={() => handleOpenEditLead(originalLead)}
+                                    style={{
+                                      padding: '5px 10px', borderRadius: 8, background: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0',
+                                      border: `1px solid ${t.inputBorder}`, color: t.text,
+                                      fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer',
+                                    }}
+                                  >
+                                    Editar ✏️
+                                  </button>
+                                )}
+                              </td>
                             </>
                           ) : (
                             <>
-                              <td style={{ padding: '12px 16px', fontFamily: 'monospace' }}>{formatCOP(v.valorDeclaracion)}</td>
-                              <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#4ED6A1', textAlign: 'right', fontWeight: 700 }}>{formatCOP(miAmt)}</td>
+                              <td style={{ padding: '14px 16px', textAlign: 'left', fontFamily: 'monospace' }}>
+                                {formatCOP(v.valorDeclaracion)}
+                              </td>
+                              <td style={{ padding: '14px 16px', textAlign: 'right', fontFamily: 'monospace', color: '#4ED6A1', fontWeight: 700 }}>
+                                {formatCOP(miAmt)}
+                              </td>
                             </>
                           )}
                         </tr>

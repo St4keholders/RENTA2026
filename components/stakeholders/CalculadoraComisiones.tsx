@@ -11,23 +11,22 @@ export default function CalculadoraComisiones({ isDark = true }: CalculadoraComi
   const [hasRef, setHasRef] = useState<boolean>(true);
   const [hasVend, setHasVend] = useState<boolean>(true);
 
-  const TOPE = 500000;
   const val = Number(declaracionVal) || 0;
-  const refPct = val > TOPE ? 5 : 10;
+  const refPct = 5;
+  const vendPct = 15;
+  const devPct = 10;
 
   const pctRefAmt = hasRef ? refPct : 0;
-  const pctVendAmt = hasVend ? 10 : 0;
-  const pctDes = 5;
+  const pctVendAmt = hasVend ? vendPct : 0;
 
-  // Contador recibe 65 base + remanentes de referido/vendedor si no participan
-  const pctContador = 65 + (hasRef ? 0 : refPct) + (hasVend ? 0 : 10);
-  const pctPlataforma = Math.max(0, 100 - pctContador - pctRefAmt - pctVendAmt - pctDes);
+  // Contador recibe 70% base + remanentes de referido (5%) / vendedor (15%) si no participan
+  const pctContador = 70 + (hasRef ? 0 : refPct) + (hasVend ? 0 : vendPct);
+  const pctPlataforma = devPct;
 
   const amtContador = (val * pctContador) / 100;
   const amtReferido = (val * pctRefAmt) / 100;
   const amtVendedor = (val * pctVendAmt) / 100;
-  const amtDesarrollo = (val * pctDes) / 100;
-  const amtPlataforma = (val * pctPlataforma) / 100;
+  const amtDesarrollo = (val * pctPlataforma) / 100;
 
   const formatCOP = (num: number) =>
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(num);
@@ -43,7 +42,7 @@ export default function CalculadoraComisiones({ isDark = true }: CalculadoraComi
         borderRadius: 20,
         padding: '24px',
         color: isDark ? '#FFFFFF' : '#0F172A',
-        maxWidth: 540,
+        maxWidth: 560,
         margin: '0 auto',
         boxShadow: isDark ? 'none' : '0 10px 30px rgba(0,0,0,0.05)',
       }}
@@ -54,7 +53,7 @@ export default function CalculadoraComisiones({ isDark = true }: CalculadoraComi
             Calculadora de Rendimiento y Reparto
           </h3>
           <p style={{ margin: 0, fontSize: 12, color: subtextColor }}>
-            Simula las ganancias netas por declaración según el modelo 65/10/5
+            Simula las ganancias netas por declaración (Modelo 70 / 15 / 5 / 10)
           </p>
         </div>
       </div>
@@ -93,7 +92,7 @@ export default function CalculadoraComisiones({ isDark = true }: CalculadoraComi
               onChange={(e) => setHasRef(e.target.checked)}
               style={{ width: 16, height: 16, accentColor: '#38BDF8' }}
             />
-            ¿Viene por Referido? ({refPct}%)
+            ¿Viene por Referido? (5%)
           </label>
 
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', color: isDark ? '#FFFFFF' : '#0F172A' }}>
@@ -103,7 +102,7 @@ export default function CalculadoraComisiones({ isDark = true }: CalculadoraComi
               onChange={(e) => setHasVend(e.target.checked)}
               style={{ width: 16, height: 16, accentColor: '#38BDF8' }}
             />
-            ¿Viene por Vendedor? (10%)
+            ¿Viene por Vendedor? (Hasta 15%)
           </label>
         </div>
       </div>
@@ -124,7 +123,7 @@ export default function CalculadoraComisiones({ isDark = true }: CalculadoraComi
         >
           <div>
             <div style={{ fontWeight: 700, fontSize: 14, color: isDark ? '#7DD3FC' : '#0369A1' }}>Contador Asignado</div>
-            <div style={{ fontSize: 11, color: subtextColor }}>Base {pctContador}% de la tarifa</div>
+            <div style={{ fontSize: 11, color: subtextColor }}>Base {pctContador}% de la tarifa (70% base)</div>
           </div>
           <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace', color: isDark ? '#38BDF8' : '#0284C7' }}>
             {formatCOP(amtContador)}
@@ -146,7 +145,7 @@ export default function CalculadoraComisiones({ isDark = true }: CalculadoraComi
           >
             <div>
               <div style={{ fontWeight: 700, fontSize: 14, color: isDark ? '#4ED6A1' : '#15803D' }}>Referido</div>
-              <div style={{ fontSize: 11, color: subtextColor }}>Comisión {pctRefAmt}% por traer el cliente</div>
+              <div style={{ fontSize: 11, color: subtextColor }}>Comisión {refPct}% por traer el cliente</div>
             </div>
             <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace', color: isDark ? '#4ED6A1' : '#16A34A' }}>
               {formatCOP(amtReferido)}
@@ -169,7 +168,7 @@ export default function CalculadoraComisiones({ isDark = true }: CalculadoraComi
           >
             <div>
               <div style={{ fontWeight: 700, fontSize: 14, color: isDark ? '#FBBF24' : '#B45309' }}>Vendedor</div>
-              <div style={{ fontSize: 11, color: subtextColor }}>Comisión 10% por atención / venta</div>
+              <div style={{ fontSize: 11, color: subtextColor }}>Comisión {vendPct}% por venta / atención</div>
             </div>
             <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace', color: isDark ? '#FBBF24' : '#D97706' }}>
               {formatCOP(amtVendedor)}
@@ -177,7 +176,7 @@ export default function CalculadoraComisiones({ isDark = true }: CalculadoraComi
           </div>
         )}
 
-        {/* Desarrollo */}
+        {/* Desarrollo & Mantenimiento */}
         <div
           style={{
             display: 'flex',
@@ -190,32 +189,11 @@ export default function CalculadoraComisiones({ isDark = true }: CalculadoraComi
           }}
         >
           <div>
-            <div style={{ fontWeight: 700, fontSize: 14, color: isDark ? '#C084FC' : '#7E22CE' }}>Desarrollo &amp; Soporte</div>
-            <div style={{ fontSize: 11, color: subtextColor }}>Fijo 5% por mantenimiento</div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: isDark ? '#C084FC' : '#7E22CE' }}>Desarrollo &amp; Mantenimiento</div>
+            <div style={{ fontSize: 11, color: subtextColor }}>Fijo 10% por mantenimiento y plataforma</div>
           </div>
           <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace', color: isDark ? '#C084FC' : '#9333EA' }}>
             {formatCOP(amtDesarrollo)}
-          </span>
-        </div>
-
-        {/* Plataforma */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '12px 16px',
-            borderRadius: 12,
-            background: isDark ? 'rgba(255, 255, 255, 0.05)' : '#F8FAFC',
-            border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0'}`,
-          }}
-        >
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 14, color: isDark ? '#CBD5E1' : '#334155' }}>Plataforma (Utilidad)</div>
-            <div style={{ fontSize: 11, color: subtextColor }}>Remanente neto plataforma</div>
-          </div>
-          <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace', color: isDark ? '#F1F5F9' : '#0F172A' }}>
-            {formatCOP(amtPlataforma)}
           </span>
         </div>
       </div>

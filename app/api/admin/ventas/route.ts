@@ -19,8 +19,6 @@ export async function GET() {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    const TOPE = 500000;
-
     let totalVentasBrutas = 0;
     let totalComisionesContadores = 0;
     let totalComisionesVendedores = 0;
@@ -36,22 +34,21 @@ export async function GET() {
       const hasRef = Boolean(lead.referrer_id);
       const hasVend = Boolean(lead.seller_id);
 
-      const refPct = valorDeclaracion > TOPE ? 5 : 10;
-      const pctRefAmt = hasRef ? refPct : 0;
-      const pctVendAmt = hasVend ? 10 : 0;
-      const pctDes = 5;
+      const refPct = 5;
+      const vendPct = 15;
+      const devPct = 10;
 
-      // El contador absorbe lo que no ocupe referido ni vendedor
-      const pctContador = 65 + (hasRef ? 0 : refPct) + (hasVend ? 0 : 10);
+      const pctRefAmt = hasRef ? refPct : 0;
+      const pctVendAmt = hasVend ? vendPct : 0;
+
+      // El contador absorbe lo que no ocupe referido (5%) ni vendedor (15%)
+      const pctContador = 70 + (hasRef ? 0 : refPct) + (hasVend ? 0 : vendPct);
 
       const amtContador = (valorDeclaracion * pctContador) / 100;
       const amtReferido = (valorDeclaracion * pctRefAmt) / 100;
       const amtVendedor = (valorDeclaracion * pctVendAmt) / 100;
-      const amtDesarrollo = (valorDeclaracion * pctDes) / 100;
-
-      // Remanente plataforma + consultoría completa
-      const platPct = 100 - pctContador - pctRefAmt - pctVendAmt - pctDes;
-      const amtPlataforma = (valorDeclaracion * Math.max(platPct, 0)) / 100 + valorConsultoria;
+      const amtDesarrollo = (valorDeclaracion * devPct) / 100;
+      const amtPlataforma = amtDesarrollo + valorConsultoria;
 
       totalVentasBrutas += totalVentaCliente;
       totalComisionesContadores += amtContador;
@@ -82,8 +79,7 @@ export async function GET() {
     const totalCostosComisiones =
       totalComisionesContadores +
       totalComisionesVendedores +
-      totalComisionesReferidos +
-      totalDesarrollo;
+      totalComisionesReferidos;
 
     return NextResponse.json({
       resumen: {
