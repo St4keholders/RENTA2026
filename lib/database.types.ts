@@ -296,11 +296,13 @@ export type Database = {
           debe_declarar: boolean
           edad: number
           estado: string
+          etapa?: string
           extemporaneo: boolean
           fecha_vencimiento: string | null
           id: string
           nombre: string
           ocupacion: string
+          pagado?: boolean
           slug_publico: string
           topes_superados: string[]
           updated_at: string | null
@@ -319,11 +321,13 @@ export type Database = {
           debe_declarar: boolean
           edad: number
           estado?: string
+          etapa?: string
           extemporaneo?: boolean
           fecha_vencimiento?: string | null
           id?: string
           nombre: string
           ocupacion: string
+          pagado?: boolean
           slug_publico?: string
           topes_superados?: string[]
           updated_at?: string | null
@@ -342,11 +346,13 @@ export type Database = {
           debe_declarar?: boolean
           edad?: number
           estado?: string
+          etapa?: string
           extemporaneo?: boolean
           fecha_vencimiento?: string | null
           id?: string
           nombre?: string
           ocupacion?: string
+          pagado?: boolean
           slug_publico?: string
           topes_superados?: string[]
           updated_at?: string | null
@@ -377,6 +383,8 @@ export type Database = {
           customer_name: string | null
           customer_phone: string | null
           id: string
+          lead_id: string | null
+          lead_slug: string | null
           payment_method_type: string | null
           reference: string
           status: string
@@ -391,6 +399,8 @@ export type Database = {
           customer_name?: string | null
           customer_phone?: string | null
           id?: string
+          lead_id?: string | null
+          lead_slug?: string | null
           payment_method_type?: string | null
           reference: string
           status?: string
@@ -405,6 +415,8 @@ export type Database = {
           customer_name?: string | null
           customer_phone?: string | null
           id?: string
+          lead_id?: string | null
+          lead_slug?: string | null
           payment_method_type?: string | null
           reference?: string
           status?: string
@@ -474,6 +486,7 @@ export type Database = {
           email: string | null
           full_name: string
           id: string
+          lead_id: string | null
           phone: string | null
           referrer_id: string | null
           seller_id: string | null
@@ -490,6 +503,7 @@ export type Database = {
           email?: string | null
           full_name: string
           id?: string
+          lead_id?: string | null
           phone?: string | null
           referrer_id?: string | null
           seller_id?: string | null
@@ -506,6 +520,7 @@ export type Database = {
           email?: string | null
           full_name?: string
           id?: string
+          lead_id?: string | null
           phone?: string | null
           referrer_id?: string | null
           seller_id?: string | null

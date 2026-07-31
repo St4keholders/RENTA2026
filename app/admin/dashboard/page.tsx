@@ -40,6 +40,8 @@ interface LeadData {
   fecha_vencimiento: string;
   extemporaneo: boolean;
   estado: 'nuevo' | 'contactado' | 'agendado' | 'perdido';
+  pagado?: boolean;
+  etapa?: 'consultoria' | 'documentos' | 'anticipo' | 'declaracion' | 'entrega';
   created_at: string;
   contador_id?: string;
   arquetipos?: { nombre: string; slug: string };
@@ -94,6 +96,8 @@ export default function AdminDashboardPage() {
   const [editCelular, setEditCelular] = useState('');
   const [editCorreo, setEditCorreo] = useState('');
   const [editEstado, setEditEstado] = useState<'nuevo' | 'contactado' | 'agendado' | 'perdido'>('nuevo');
+  const [editPagado, setEditPagado] = useState(false);
+  const [editEtapa, setEditEtapa] = useState<'consultoria' | 'documentos' | 'anticipo' | 'declaracion' | 'entrega'>('consultoria');
 
   /* Form Nuevo Usuario */
   const [newUserNombre, setNewUserNombre] = useState('');
@@ -240,6 +244,38 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleUpdatePagadoLead = async (leadId: string, nuevoPagado: boolean) => {
+    setLoadingText('Actualizando estado de pago...');
+    setGlobalLoading(true);
+    try {
+      await fetch('/api/admin/leads', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: leadId, pagado: nuevoPagado }),
+      });
+      await loadData('Estado de pago actualizado');
+    } catch (e) {
+      console.error(e);
+      setGlobalLoading(false);
+    }
+  };
+
+  const handleUpdateEtapaLead = async (leadId: string, nuevaEtapa: string) => {
+    setLoadingText('Actualizando etapa de embudo...');
+    setGlobalLoading(true);
+    try {
+      await fetch('/api/admin/leads', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: leadId, etapa: nuevaEtapa }),
+      });
+      await loadData('Etapa de embudo actualizada');
+    } catch (e) {
+      console.error(e);
+      setGlobalLoading(false);
+    }
+  };
+
   const handleAssignContador = async (leadId: string, contadorId: string | null) => {
     setLoadingText('Asignando lead...');
     setGlobalLoading(true);
@@ -301,6 +337,8 @@ export default function AdminDashboardPage() {
     setEditCelular(lead.celular || '');
     setEditCorreo(lead.correo || '');
     setEditEstado(lead.estado || 'nuevo');
+    setEditPagado(Boolean(lead.pagado));
+    setEditEtapa(lead.etapa || 'consultoria');
   };
 
   /* Save Edit Lead handler */
@@ -321,6 +359,8 @@ export default function AdminDashboardPage() {
           celular: editCelular,
           correo: editCorreo,
           estado: editEstado,
+          pagado: editPagado,
+          etapa: editEtapa,
         }),
       });
       setEditingLead(null);
@@ -391,6 +431,8 @@ export default function AdminDashboardPage() {
   const isDev = currentUser?.rol === 'desarrollador' || currentUser?.rol === 'admin';
 
   const crmLeads = leads.filter((l) => {
+    // El CRM muestra únicamente los clientes que YA PAGARON
+    if (!l.pagado) return false;
     if (!isDev) {
       return l.contador_id === currentUser?.id;
     }
@@ -475,6 +517,7 @@ export default function AdminDashboardPage() {
 
           {/* Navigation Links */}
           <nav style={{ padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {/* 1. CRM */}
             <button
               onClick={() => { setActiveTab('crm'); setMobileMenuOpen(false); }}
               style={{
@@ -486,31 +529,13 @@ export default function AdminDashboardPage() {
                 color: activeTab === 'crm' ? t.text : t.subtext,
               }}
             >
-              CRM
+              CRM (PAGADOS)
               <span style={{ fontSize: 10, opacity: 0.7, background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)', padding: '2px 6px', borderRadius: 999 }}>
                 {crmLeads.length}
               </span>
             </button>
 
-            {isDev && (
-              <button
-                onClick={() => { setActiveTab('leads'); setMobileMenuOpen(false); }}
-                style={{
-                  width: '100%', padding: '12px 14px', borderRadius: 12, textAlign: 'left',
-                  fontFamily: 'var(--mono)', fontSize: 12, letterSpacing: '.16em', textTransform: 'uppercase',
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', transition: 'all .2s',
-                  background: activeTab === 'leads' ? 'rgba(61,107,255,0.18)' : 'transparent',
-                  border: activeTab === 'leads' ? '1px solid rgba(61,107,255,0.5)' : '1px solid transparent',
-                  color: activeTab === 'leads' ? t.text : t.subtext,
-                }}
-              >
-                LEADS
-                <span style={{ fontSize: 10, opacity: 0.7, background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)', padding: '2px 6px', borderRadius: 999 }}>
-                  {leads.length}
-                </span>
-              </button>
-            )}
-
+            {/* 2. USUARIOS */}
             {isDev && (
               <button
                 onClick={() => { setActiveTab('usuarios'); setMobileMenuOpen(false); }}
@@ -530,19 +555,24 @@ export default function AdminDashboardPage() {
               </button>
             )}
 
+            {/* 3. LEADS (ÚLTIMO TAB) */}
             {isDev && (
-              <a
-                href="/admin/pipeline"
+              <button
+                onClick={() => { setActiveTab('leads'); setMobileMenuOpen(false); }}
                 style={{
                   width: '100%', padding: '12px 14px', borderRadius: 12, textAlign: 'left',
                   fontFamily: 'var(--mono)', fontSize: 12, letterSpacing: '.16em', textTransform: 'uppercase',
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', transition: 'all .2s',
-                  background: 'transparent', border: '1px solid transparent', color: t.subtext, textDecoration: 'none',
+                  background: activeTab === 'leads' ? 'rgba(61,107,255,0.18)' : 'transparent',
+                  border: activeTab === 'leads' ? '1px solid rgba(61,107,255,0.5)' : '1px solid transparent',
+                  color: activeTab === 'leads' ? t.text : t.subtext,
                 }}
               >
-                PIPELINE
-                <span style={{ fontSize: 10, opacity: 0.7, background: isDark ? 'rgba(61,107,255,0.15)' : 'rgba(61,107,255,0.1)', padding: '2px 6px', borderRadius: 999, color: '#7DD3FC', border: '1px solid rgba(61,107,255,0.3)' }}>F2</span>
-              </a>
+                TODOS LOS LEADS
+                <span style={{ fontSize: 10, opacity: 0.7, background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)', padding: '2px 6px', borderRadius: 999 }}>
+                  {leads.length}
+                </span>
+              </button>
             )}
           </nav>
         </div>
@@ -588,8 +618,8 @@ export default function AdminDashboardPage() {
               Panel Administrativo
             </span>
             <h1 style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'clamp(1.5rem,4vw,2.2rem)', margin: 0, letterSpacing: '-.04em', color: t.text }}>
-              {activeTab === 'crm' && 'CRM — Mis Leads Asignados'}
-              {activeTab === 'leads' && 'Gestión de Leads'}
+              {activeTab === 'crm' && 'CRM — Clientes Pagados'}
+              {activeTab === 'leads' && 'Todos los Leads Registrados'}
               {activeTab === 'usuarios' && 'Usuarios y Permisos'}
             </h1>
           </div>
@@ -649,7 +679,7 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* ── TAB 1: CRM ── */}
+        {/* ── TAB 1: CRM (SOLO CLIENTES PAGADOS + PIPELINE INTEGRADO) ── */}
         {activeTab === 'crm' && (
           <div style={{
             background: t.cardBg, backdropFilter: 'blur(20px)',
@@ -661,20 +691,19 @@ export default function AdminDashboardPage() {
                 <thead>
                   <tr style={{ background: t.tableHeaderBg, borderBottom: `1px solid ${t.border}`, fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: t.tableHeaderColor }}>
                     <th style={{ padding: '16px 18px' }}>Persona / Cédula</th>
-                    <th style={{ padding: '16px 18px' }}>Arquetipo</th>
-                    <th style={{ padding: '16px 18px' }}>Veredicto DIAN</th>
-                    <th style={{ padding: '16px 18px' }}>Datos de Contacto</th>
-                    <th style={{ padding: '16px 18px' }}>Medio Contacto</th>
+                    <th style={{ padding: '16px 18px' }}>Arquetipo & Finanzas</th>
+                    <th style={{ padding: '16px 18px' }}>Etapa Embudo (Pipeline)</th>
+                    <th style={{ padding: '16px 18px' }}>Contador Asignado</th>
+                    <th style={{ padding: '16px 18px' }}>Contacto</th>
                     <th style={{ padding: '16px 18px' }}>Vencimiento</th>
-                    <th style={{ padding: '16px 18px' }}>Estado</th>
                     <th style={{ padding: '16px 18px', textAlign: 'right' }}>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {finalCrmLeads.length === 0 ? (
                     <tr>
-                      <td colSpan={8} style={{ padding: 40, textAlign: 'center', color: t.subtext, fontSize: 14 }}>
-                        No hay leads en el CRM con el criterio seleccionado.
+                      <td colSpan={7} style={{ padding: 40, textAlign: 'center', color: t.subtext, fontSize: 14 }}>
+                        No hay clientes pagados en el CRM en este momento.
                       </td>
                     </tr>
                   ) : (
@@ -688,62 +717,73 @@ export default function AdminDashboardPage() {
                           </span>
                         </td>
 
-                        {/* Arquetipo */}
-                        <td style={{ padding: '16px 18px' }}>
-                          <span style={{
-                            padding: '4px 10px', borderRadius: 999, background: 'rgba(61,107,255,0.12)',
-                            border: '1px solid rgba(61,107,255,0.3)', color: isDark ? '#7DD3FC' : '#0284C7', fontSize: 12, fontWeight: 600,
-                          }}>
-                            {lead.arquetipos?.nombre || 'General'}
-                          </span>
-                        </td>
-
-                        {/* Veredicto */}
-                        <td style={{ padding: '16px 18px' }}>
-                          {lead.debe_declarar ? (
-                            <span style={{ color: '#FF8080', fontWeight: 600, fontSize: 12 }}>DECLARA</span>
-                          ) : (
-                            <span style={{ color: isDark ? '#4ED6A1' : '#16A34A', fontWeight: 600, fontSize: 12 }}>NO DECLARA</span>
-                          )}
-                        </td>
-
-                        {/* Contacto */}
+                        {/* Arquetipo & Finanzas */}
                         <td style={{ padding: '16px 18px' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: t.text }}>
-                              {lead.celular || 'Sin celular'}
+                            <span style={{
+                              padding: '2px 8px', borderRadius: 999, background: 'rgba(61,107,255,0.12)',
+                              border: '1px solid rgba(61,107,255,0.3)', color: isDark ? '#7DD3FC' : '#0284C7', fontSize: 11, fontWeight: 600, width: 'fit-content',
+                            }}>
+                              {lead.arquetipos?.nombre || 'General'}
                             </span>
-                            <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: t.subtext }}>
-                              {lead.correo || 'Sin correo'}
+                            <span style={{ fontSize: 11, fontWeight: 600, color: lead.debe_declarar ? '#FF8080' : (isDark ? '#4ED6A1' : '#16A34A') }}>
+                              {lead.debe_declarar ? 'DECLARA RENTA' : 'NO DECLARA'}
                             </span>
                           </div>
                         </td>
 
-                        {/* Medio de Contacto */}
+                        {/* Etapa Embudo (Pipeline) */}
                         <td style={{ padding: '16px 18px' }}>
-                          {renderMedioContacto(lead)}
+                          <select
+                            value={lead.etapa || 'consultoria'}
+                            onChange={(e) => handleUpdateEtapaLead(lead.id, e.target.value)}
+                            style={{
+                              background: 'rgba(14,124,102,0.15)',
+                              border: '1px solid rgba(14,124,102,0.4)',
+                              borderRadius: 8, color: isDark ? '#4ED6A1' : '#0E7C66', padding: '6px 10px', fontSize: 11, fontFamily: 'var(--mono)', fontWeight: 600, outline: 'none',
+                            }}
+                          >
+                            <option value="consultoria" style={{ background: t.modalBg, color: t.text }}>01. Consultoría ($100k)</option>
+                            <option value="documentos" style={{ background: t.modalBg, color: t.text }}>02. Documentos</option>
+                            <option value="anticipo" style={{ background: t.modalBg, color: t.text }}>03. Anticipo (50%)</option>
+                            <option value="declaracion" style={{ background: t.modalBg, color: t.text }}>04. Declaración</option>
+                            <option value="entrega" style={{ background: t.modalBg, color: t.text }}>05. Entrega Final</option>
+                          </select>
+                        </td>
+
+                        {/* Contador Asignado */}
+                        <td style={{ padding: '16px 18px' }}>
+                          <select
+                            value={lead.contador_id || ''}
+                            onChange={(e) => handleAssignContador(lead.id, e.target.value || null)}
+                            style={{
+                              background: lead.contador_id ? 'rgba(61,107,255,0.18)' : t.inputBg,
+                              border: lead.contador_id ? '1px solid rgba(61,107,255,0.5)' : `1px solid ${t.inputBorder}`,
+                              borderRadius: 8, color: t.inputColor, padding: '4px 8px', fontSize: 11, fontFamily: 'var(--body)', outline: 'none',
+                            }}
+                          >
+                            <option value="" style={{ background: t.modalBg, color: t.text }}>Sin asignar</option>
+                            {usuarios.map((u) => (
+                              <option key={u.id} value={u.id} style={{ background: t.modalBg, color: t.text }}>
+                                {u.nombre} ({u.rol})
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+
+                        {/* Contacto */}
+                        <td style={{ padding: '16px 18px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: t.text }}>
+                              {lead.celular || 'Sin celular'}
+                            </span>
+                            {renderMedioContacto(lead)}
+                          </div>
                         </td>
 
                         {/* Vencimiento */}
                         <td style={{ padding: '16px 18px', fontFamily: 'var(--mono)', fontSize: 11, color: t.subtext }}>
                           {lead.fecha_vencimiento || 'Sin fecha'}
-                        </td>
-
-                        {/* Estado */}
-                        <td style={{ padding: '16px 18px' }}>
-                          <select
-                            value={lead.estado}
-                            onChange={(e) => handleUpdateEstadoLead(lead.id, e.target.value)}
-                            style={{
-                              background: t.inputBg, border: `1px solid ${t.inputBorder}`,
-                              borderRadius: 8, color: t.inputColor, padding: '4px 8px', fontSize: 11, fontFamily: 'var(--mono)', outline: 'none',
-                            }}
-                          >
-                            <option value="nuevo" style={{ background: t.modalBg, color: t.text }}>nuevo</option>
-                            <option value="contactado" style={{ background: t.modalBg, color: t.text }}>contactado</option>
-                            <option value="agendado" style={{ background: t.modalBg, color: t.text }}>agendado</option>
-                            <option value="perdido" style={{ background: t.modalBg, color: t.text }}>perdido</option>
-                          </select>
                         </td>
 
                         {/* Acciones CRM */}
@@ -758,8 +798,19 @@ export default function AdminDashboardPage() {
                                 fontFamily: 'var(--mono)', fontSize: 11, textDecoration: 'none',
                               }}
                             >
-                              Ver Resultado ↗
+                              Resultado ↗
                             </Link>
+
+                            <button
+                              onClick={() => setSelectedRespuestasLead(lead)}
+                              style={{
+                                padding: '5px 10px', borderRadius: 8, background: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0',
+                                border: `1px solid ${t.inputBorder}`, color: t.text,
+                                fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer',
+                              }}
+                            >
+                              Finanzas
+                            </button>
 
                             <button
                               onClick={() => handleOpenEditLead(lead)}
@@ -773,27 +824,16 @@ export default function AdminDashboardPage() {
                             </button>
 
                             <button
-                              onClick={() => setSelectedRespuestasLead(lead)}
-                              style={{
-                                padding: '5px 10px', borderRadius: 8, background: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0',
-                                border: `1px solid ${t.inputBorder}`, color: t.text,
-                                fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer',
-                              }}
-                            >
-                              Respuestas
-                            </button>
-
-                            <button
                               onClick={() => handleRemoveFromCRM(lead.id)}
                               title="Eliminar de mi CRM"
                               style={{
                                 padding: '5px 10px', borderRadius: 8, background: 'rgba(255,80,80,0.14)',
                                 border: '1px solid rgba(255,80,80,0.3)', color: '#FF8080',
                                 fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer',
-                                display: 'inline-flex', alignItems: 'center', gap: 6,
+                                display: 'inline-flex', alignItems: 'center', gap: 4,
                               }}
                             >
-                              <TrashIcon /> Eliminar
+                              <TrashIcon />
                             </button>
                           </div>
                         </td>
@@ -806,7 +846,7 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
-        {/* ── TAB 2: LEADS (Desarrollador) ── */}
+        {/* ── TAB 3: LEADS (ÚLTIMO TAB — TODOS LOS REGISTROS) ── */}
         {activeTab === 'leads' && isDev && (
           <div style={{
             background: t.cardBg, backdropFilter: 'blur(20px)',
@@ -820,8 +860,9 @@ export default function AdminDashboardPage() {
                     <th style={{ padding: '16px 18px' }}>Persona</th>
                     <th style={{ padding: '16px 18px' }}>Contacto</th>
                     <th style={{ padding: '16px 18px' }}>Arquetipo</th>
-                    <th style={{ padding: '16px 18px' }}>Asignar al CRM</th>
-                    <th style={{ padding: '16px 18px' }}>Vencimiento</th>
+                    <th style={{ padding: '16px 18px' }}>Estado de Pago</th>
+                    <th style={{ padding: '16px 18px' }}>Etapa Embudo</th>
+                    <th style={{ padding: '16px 18px' }}>Asignar Contador</th>
                     <th style={{ padding: '16px 18px', textAlign: 'right' }}>Acciones</th>
                   </tr>
                 </thead>
@@ -844,6 +885,30 @@ export default function AdminDashboardPage() {
                         <span style={{ color: isDark ? '#7DD3FC' : '#0284C7', fontWeight: 600 }}>{lead.arquetipos?.nombre || 'General'}</span>
                       </td>
 
+                      {/* Estado de Pago (Editable) */}
+                      <td style={{ padding: '16px 18px' }}>
+                        <select
+                          value={lead.pagado ? 'true' : 'false'}
+                          onChange={(e) => handleUpdatePagadoLead(lead.id, e.target.value === 'true')}
+                          style={{
+                            background: lead.pagado ? 'rgba(78,214,161,0.18)' : 'rgba(255,80,80,0.12)',
+                            border: lead.pagado ? '1px solid rgba(78,214,161,0.5)' : '1px solid rgba(255,80,80,0.3)',
+                            borderRadius: 8, color: lead.pagado ? (isDark ? '#4ED6A1' : '#16A34A') : '#FF8080',
+                            padding: '6px 10px', fontSize: 11, fontFamily: 'var(--mono)', fontWeight: 700, outline: 'none',
+                          }}
+                        >
+                          <option value="false" style={{ background: t.modalBg, color: t.text }}>❌ No Pagado</option>
+                          <option value="true" style={{ background: t.modalBg, color: t.text }}>✅ PAGADO (Pasa a CRM)</option>
+                        </select>
+                      </td>
+
+                      {/* Etapa Embudo */}
+                      <td style={{ padding: '16px 18px' }}>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: t.subtext, textTransform: 'capitalize' }}>
+                          {lead.etapa || 'consultoria'}
+                        </span>
+                      </td>
+
                       {/* Asignar a CRM */}
                       <td style={{ padding: '16px 18px' }}>
                         <select
@@ -862,10 +927,6 @@ export default function AdminDashboardPage() {
                             </option>
                           ))}
                         </select>
-                      </td>
-
-                      <td style={{ padding: '16px 18px', fontFamily: 'var(--mono)', fontSize: 11, color: t.subtext }}>
-                        {lead.fecha_vencimiento || 'Sin fecha'}
                       </td>
 
                       {/* Acciones LEADS */}
@@ -915,7 +976,7 @@ export default function AdminDashboardPage() {
                               display: 'inline-flex', alignItems: 'center', gap: 6,
                             }}
                           >
-                            <TrashIcon /> Eliminar
+                            <TrashIcon />
                           </button>
                         </div>
                       </td>
@@ -927,7 +988,7 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
-        {/* ── TAB 3: USUARIOS ── */}
+        {/* ── TAB 2: USUARIOS ── */}
         {activeTab === 'usuarios' && isDev && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24 }}>
             {/* Form Crear Usuario */}
@@ -1072,7 +1133,7 @@ export default function AdminDashboardPage() {
         }}>
           <div style={{ position: 'absolute', inset: 0, background: isDark ? 'rgba(0,0,0,0.85)' : 'rgba(15,23,42,0.6)', backdropFilter: 'blur(12px)' }} onClick={() => setEditingLead(null)} />
           <div style={{
-            position: 'relative', width: '100%', maxWidth: 480,
+            position: 'relative', width: '100%', maxWidth: 500,
             background: t.modalBg, border: `1px solid ${t.border}`, borderRadius: 24,
             padding: '28px 24px', boxShadow: '0 0 80px rgba(61,107,255,0.25)', color: t.text,
           }}>
@@ -1122,39 +1183,58 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 10, color: t.subtext, marginBottom: 6 }}>
-                  Celular
-                </label>
-                <input
-                  type="text" value={editCelular} onChange={(e) => setEditCelular(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: 10, color: t.inputColor, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 10, color: t.subtext, marginBottom: 6 }}>
+                    Celular
+                  </label>
+                  <input
+                    type="text" value={editCelular} onChange={(e) => setEditCelular(e.target.value)}
+                    style={{ width: '100%', padding: '10px 14px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: 10, color: t.inputColor, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 10, color: t.subtext, marginBottom: 6 }}>
+                    Correo Electrónico
+                  </label>
+                  <input
+                    type="email" value={editCorreo} onChange={(e) => setEditCorreo(e.target.value)}
+                    style={{ width: '100%', padding: '10px 14px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: 10, color: t.inputColor, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                  />
+                </div>
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 10, color: t.subtext, marginBottom: 6 }}>
-                  Correo Electrónico
-                </label>
-                <input
-                  type="email" value={editCorreo} onChange={(e) => setEditCorreo(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: 10, color: t.inputColor, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
-                />
-              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 10, color: t.subtext, marginBottom: 6 }}>
+                    Estado de Pago
+                  </label>
+                  <select
+                    value={editPagado ? 'true' : 'false'}
+                    onChange={(e) => setEditPagado(e.target.value === 'true')}
+                    style={{ width: '100%', padding: '10px 14px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: 10, color: t.inputColor, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                  >
+                    <option value="false" style={{ background: t.modalBg, color: t.text }}>❌ No Pagado</option>
+                    <option value="true" style={{ background: t.modalBg, color: t.text }}>✅ Pagado (CRM)</option>
+                  </select>
+                </div>
 
-              <div>
-                <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 10, color: t.subtext, marginBottom: 6 }}>
-                  Estado del Lead
-                </label>
-                <select
-                  value={editEstado} onChange={(e) => setEditEstado(e.target.value as any)}
-                  style={{ width: '100%', padding: '10px 14px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: 10, color: t.inputColor, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
-                >
-                  <option value="nuevo" style={{ background: t.modalBg, color: t.text }}>nuevo</option>
-                  <option value="contactado" style={{ background: t.modalBg, color: t.text }}>contactado</option>
-                  <option value="agendado" style={{ background: t.modalBg, color: t.text }}>agendado</option>
-                  <option value="perdido" style={{ background: t.modalBg, color: t.text }}>perdido</option>
-                </select>
+                <div>
+                  <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 10, color: t.subtext, marginBottom: 6 }}>
+                    Etapa del Embudo
+                  </label>
+                  <select
+                    value={editEtapa}
+                    onChange={(e) => setEditEtapa(e.target.value as any)}
+                    style={{ width: '100%', padding: '10px 14px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: 10, color: t.inputColor, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                  >
+                    <option value="consultoria" style={{ background: t.modalBg, color: t.text }}>01. Consultoría</option>
+                    <option value="documentos" style={{ background: t.modalBg, color: t.text }}>02. Documentos</option>
+                    <option value="anticipo" style={{ background: t.modalBg, color: t.text }}>03. Anticipo (50%)</option>
+                    <option value="declaracion" style={{ background: t.modalBg, color: t.text }}>04. Declaración</option>
+                    <option value="entrega" style={{ background: t.modalBg, color: t.text }}>05. Entrega Final</option>
+                  </select>
+                </div>
               </div>
 
               <div style={{ display: 'flex', gap: 12, marginTop: 10 }}>

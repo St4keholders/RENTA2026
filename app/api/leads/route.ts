@@ -62,6 +62,16 @@ export async function POST(request: Request) {
       version_motor: 'v1.0',
     });
 
+    // 3. Auto-crear entrada en pipeline_leads (etapa inicial: consultoria)
+    await supabase.from('pipeline_leads').insert({
+      full_name: payload.nombre,
+      email: payload.celular || null, // se usa celular como identificador
+      phone: payload.celular || null,
+      source: 'formulario',
+      stage: 'consultoria',
+      lead_id: leadData.id,
+    }).select('id').maybeSingle(); // maybeSingle para no fallar si hay constraint
+
     return NextResponse.json({
       success: true,
       slugPublico: leadData.slug_publico,
@@ -71,3 +81,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error?.message || 'Error interno del servidor' }, { status: 500 });
   }
 }
+

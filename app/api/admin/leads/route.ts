@@ -12,7 +12,7 @@ export async function GET() {
         id, slug_publico, nombre, cedula, edad, ocupacion,
         celular, correo, debe_declarar, topes_superados,
         barra_patrimonio, barra_ingresos, barra_creditos, barra_movimientos,
-        fecha_vencimiento, extemporaneo, estado, created_at, contador_id,
+        fecha_vencimiento, extemporaneo, estado, pagado, etapa, created_at, contador_id,
         arquetipos (nombre, slug),
         usuarios!leads_contador_id_fkey (id, nombre, email),
         respuestas (payload, version_motor, created_at),
@@ -32,7 +32,7 @@ export async function GET() {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
-    const { id, nombre, cedula, edad, celular, correo, estado, contador_id } = body;
+    const { id, nombre, cedula, edad, celular, correo, estado, contador_id, pagado, etapa } = body;
 
     if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 });
 
@@ -44,6 +44,8 @@ export async function PATCH(request: Request) {
     if (correo !== undefined) updates.correo = correo;
     if (estado !== undefined) updates.estado = estado;
     if (contador_id !== undefined) updates.contador_id = contador_id;
+    if (pagado !== undefined) updates.pagado = Boolean(pagado);
+    if (etapa !== undefined) updates.etapa = etapa;
 
     const supabase = supabaseAdmin();
     const { error } = await supabase.from('leads').update(updates as any).eq('id', id);

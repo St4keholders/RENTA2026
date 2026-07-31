@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     // 2. Verificar que la orden exista y consultar su monto registrado
     const { data: order } = await supabase
       .from('orders')
-      .select('id, amount_in_cents, status')
+      .select('id, amount_in_cents, status, lead_id, lead_slug')
       .eq('reference', reference)
       .single();
 
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Monto no coincide' }, { status: 400 });
     }
 
-    // 4. Actualizar estado de la orden en Supabase usando service_role
+    // 4. Actualizar estado de la orden
     const { error: updateError } = await supabase
       .from('orders')
       .update({
@@ -63,6 +63,37 @@ export async function POST(request: Request) {
     if (updateError) {
       console.error(`Error actualizando orden ${reference}:`, updateError);
       return NextResponse.json({ error: 'Error actualizando orden' }, { status: 500 });
+    }
+
+    // 5. Si el pago fue APROBADO → marcar el lead como pagado y avanzar etapa
+    if (status === 'APPROVED') {
+      let leadId = order.lead_id;
+
+      // Si no tenemos lead_id directo, resolver por lead_slug
+      if (!leadId && order.lead_slug) {
+        const { data: leadData } = await supabase
+          .from('leads')
+          .select('id')
+          .eq('slug_publico', order.lead_slug)
+          .single();
+        leadId = leadData?.id ?? null;
+      }
+
+      if (leadId) {
+        // Marcar como pagado y avanzar a etapa de documentos
+        await supabase
+          .from('leads')
+          .update({ pagado: true, etapa: 'documentos', estado: 'agendado' })
+          .eq('id', leadId);
+
+        // Actualizar etapa en pipeline_leads también
+        await supabase
+          .from('pipeline_leads')
+          .update({ stage: 'documentos', updated_at: new Date().toISOString() })
+          .eq('lead_id', leadId);
+
+        console.log(`✅ Lead ${leadId} marcado como PAGADO, etapa → documentos`);
+      }
     }
 
     console.log(`✅ Orden ${reference} actualizada a estado: ${status}`);

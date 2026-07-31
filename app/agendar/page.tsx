@@ -15,29 +15,11 @@ function AgendarContent() {
   const searchParams = useSearchParams();
   const leadSlug = searchParams.get('lead') || '';
 
-  const [contadores, setContadores] = useState<Contador[]>([]);
-  const [selectedContador, setSelectedContador] = useState<number | null>(null);
   const [fecha, setFecha] = useState('');
   const [hora, setHora] = useState('10:00');
   const [medioContacto, setMedioContacto] = useState<'llamada' | 'videollamada' | 'whatsapp'>('whatsapp');
   const [loading, setLoading] = useState(false);
-  const [completed, setCompleted] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-
-  useEffect(() => {
-    // Fetch contadores
-    fetch('/api/contadores')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.contadores) {
-          setContadores(data.contadores);
-          if (data.contadores.length > 0) {
-            setSelectedContador(data.contadores[0].id);
-          }
-        }
-      })
-      .catch(() => {});
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,79 +34,39 @@ function AgendarContent() {
     try {
       const fechaConsulta = `${fecha}T${hora}:00Z`;
 
-      const res = await fetch('/api/ventas', {
+      // 1. Guardar la cita/venta
+      await fetch('/api/ventas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           leadSlug,
-          contadorId: selectedContador,
           fechaConsulta,
           medioContacto,
         }),
       });
 
-      // Redirigir al cobro de Wompi ($100.000 COP)
-      try {
-        const checkoutRes = await fetch('/api/checkout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            customer_name: 'Cliente Renta',
-          }),
-        });
-        const checkoutData = await checkoutRes.json();
-        if (checkoutData.checkoutUrl) {
-          window.location.href = checkoutData.checkoutUrl;
-          return;
-        }
-      } catch (chkErr) {
-        console.error('Error al iniciar cobro Wompi:', chkErr);
+      // 2. Redirigir directamente al cobro de Wompi ($100.000 COP)
+      const checkoutRes = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lead_slug: leadSlug,
+          customer_name: 'Cliente Renta',
+        }),
+      });
+      const checkoutData = await checkoutRes.json();
+      if (checkoutData.checkoutUrl) {
+        window.location.href = checkoutData.checkoutUrl;
+        return;
+      } else {
+        throw new Error('No se pudo generar el enlace de pago');
       }
-
-      setCompleted(true);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error inesperado';
       setErrorMsg(msg);
-    } finally {
       setLoading(false);
     }
   };
-
-  if (completed) {
-    return (
-      <div className="sky-card p-8 rounded-3xl max-w-lg w-full text-center">
-        <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-3xl mx-auto mb-4">
-          ✓
-        </div>
-        <h2 className="text-3xl font-serif-display font-bold mb-2">¡Cita Agendada!</h2>
-        <p className="text-sm text-slate-600 mb-6">
-          Hemos registrado tu consultoría contable. Nos pondremos en contacto contigo al número de WhatsApp registrado para confirmar y coordinar la sesión.
-        </p>
-
-        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-left mb-6 space-y-2">
-          <div className="flex justify-between">
-            <span className="text-slate-500">Valor de la consultoría:</span>
-            <span className="font-bold text-[var(--sky-deep)]">$100.000 COP</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-slate-500">Abonable a tu declaración:</span>
-            <span className="font-bold text-emerald-600">100% Abonable</span>
-          </div>
-          <div className="flex justify-between border-t border-slate-200 pt-2">
-            <span className="text-slate-500">Estado de la reserva:</span>
-            <span className="font-mono-code text-[var(--sky-deep)]">Confirmación en proceso</span>
-          </div>
-        </div>
-
-        <Link
-          href="/"
-          className="sky-btn inline-block px-6 py-3 rounded-xl font-bold text-sm"
-        >
-          Volver al Inicio
-        </Link>
-      </div>
-    );
-  }
 
   return (
     <div className="sky-card p-6 md:p-10 rounded-3xl max-w-xl w-full">
@@ -145,30 +87,6 @@ function AgendarContent() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Seleccionar Contador */}
-        <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
-            Selecciona tu Contador Preferido
-          </label>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {contadores.map((c) => (
-              <button
-                type="button"
-                key={c.id}
-                onClick={() => setSelectedContador(c.id)}
-                className={`p-3 rounded-xl border text-left text-xs transition-all ${
-                  selectedContador === c.id
-                    ? 'border-[var(--sky-deep)] bg-[var(--sky-pale)] text-[var(--sky-deep)]'
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <span className="block font-bold text-slate-800">{c.nombre}</span>
-                <span className="block text-[10px] font-mono-code opacity-75">{c.credencial}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* Seleccionar Fecha y Hora */}
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -237,8 +155,8 @@ function AgendarContent() {
             <span className="font-bold text-slate-900">$100.000 COP</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-slate-600">Estado de pago (Fase 1):</span>
-            <span className="font-mono-code text-amber-600 font-semibold">Registro previo / Pago manual</span>
+            <span className="text-slate-600">Proceso:</span>
+            <span className="font-mono-code text-[var(--sky-deep)] font-semibold">Redirección a pasarela de pago</span>
           </div>
         </div>
 
@@ -247,7 +165,7 @@ function AgendarContent() {
           disabled={loading}
           className="w-full sky-btn py-4 rounded-xl font-bold text-base shadow-lg"
         >
-          {loading ? 'Confirmando Cita...' : 'Confirmar Reserva de Cita ($100.000 Abono)'}
+          {loading ? 'Redirigiendo a Pasarela de Pago...' : 'Ir a Pagar ($100.000 COP)'}
         </button>
       </form>
     </div>

@@ -4,7 +4,7 @@ import { generateIntegritySignature, getWompiConfig } from '@/lib/wompi';
 
 export async function POST(request: Request) {
   try {
-    const { customer_email, customer_name, customer_phone } = await request.json();
+    const { customer_email, customer_name, customer_phone, lead_slug } = await request.json();
 
     const amountInCents = 10000000; // $100.000 COP en centavos
     const currency = 'COP';
@@ -13,6 +13,18 @@ export async function POST(request: Request) {
     // 1. Intentar guardar orden en Supabase (no bloquea si falla)
     try {
       const supabase = supabaseAdmin();
+
+      // Resolver lead_id desde lead_slug si se proveyó
+      let leadId: string | null = null;
+      if (lead_slug) {
+        const { data: leadData } = await supabase
+          .from('leads')
+          .select('id')
+          .eq('slug_publico', lead_slug)
+          .single();
+        leadId = leadData?.id ?? null;
+      }
+
       const { error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -23,6 +35,8 @@ export async function POST(request: Request) {
           customer_name: customer_name || null,
           customer_phone: customer_phone || null,
           status: 'PENDING',
+          lead_slug: lead_slug || null,
+          lead_id: leadId,
         });
 
       if (orderError) {
