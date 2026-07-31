@@ -4,7 +4,7 @@ import { generateIntegritySignature, getWompiConfig } from '@/lib/wompi';
 
 export async function POST(request: Request) {
   try {
-    const { customer_email, customer_name, customer_phone, lead_slug } = await request.json();
+    const { customer_email, customer_name, customer_phone, lead_slug, lead_id } = await request.json();
 
     const amountInCents = 10000000; // $100.000 COP en centavos
     const currency = 'COP';
@@ -14,15 +14,15 @@ export async function POST(request: Request) {
     try {
       const supabase = supabaseAdmin();
 
-      // Resolver lead_id desde lead_slug si se proveyó
-      let leadId: string | null = null;
-      if (lead_slug) {
+      // Resolver lead_id desde lead_id directo o lead_slug
+      let resolvedLeadId: string | null = lead_id || null;
+      if (!resolvedLeadId && lead_slug) {
         const { data: leadData } = await supabase
           .from('leads')
           .select('id')
           .eq('slug_publico', lead_slug)
           .single();
-        leadId = leadData?.id ?? null;
+        resolvedLeadId = leadData?.id ?? null;
       }
 
       const { error: orderError } = await supabase
@@ -36,12 +36,13 @@ export async function POST(request: Request) {
           customer_phone: customer_phone || null,
           status: 'PENDING',
           lead_slug: lead_slug || null,
-          lead_id: leadId,
+          lead_id: resolvedLeadId,
         });
 
       if (orderError) {
-        // Solo loguear — no bloquear el checkout
         console.warn('[checkout] No se pudo crear orden en Supabase:', orderError.message);
+      } else {
+        console.log(`✅ [checkout] Orden ${reference} creada con lead_id: ${resolvedLeadId}`);
       }
     } catch (dbErr: any) {
       console.warn('[checkout] Error de base de datos (no bloquea):', dbErr?.message);

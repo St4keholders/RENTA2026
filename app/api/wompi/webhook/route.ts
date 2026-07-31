@@ -2,51 +2,45 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { verifyEventChecksum } from '@/lib/wompi';
 
-/* GET /api/wompi/webhook — comprobación de estado */
-export async function GET() {
-  return NextResponse.json({ status: 'ok', message: 'Wompi Webhook Endpoint Ready' });
-}
-
 export async function POST(request: Request) {
   try {
-    const payload = await request.json();
+    const body = await request.json();
 
-    // 1. Validar checksum de seguridad del webhook
-    const isValid = verifyEventChecksum(payload);
+    // 1. Extraer los datos del evento de Wompi
+    const event = body?.event;
+    const transaction = body?.data?.transaction;
+
+    if (event !== 'transaction.updated' || !transaction) {
+      return NextResponse.json({ message: 'Evento ignorado' }, { status: 200 });
+    }
+
+    const {
+      id: transactionId,
+      reference,
+      status,
+      payment_method_type,
+    } = transaction;
+
+    console.log(`[wompi-webhook] Evento recibido: Ref ${reference} | Estado: ${status} | Trans: ${transactionId}`);
+
+    // 2. Verificar la firma de integridad de Wompi
+    const isValid = verifyEventChecksum(body);
     if (!isValid) {
-      console.warn('⚠️ Webhook de Wompi descartado: Firma/checksum no coincide.');
-      return NextResponse.json({ error: 'Firma inválida' }, { status: 400 });
-    }
-
-    const transaction = payload.data?.transaction;
-    if (!transaction) {
-      return NextResponse.json({ error: 'Payload incompleto' }, { status: 400 });
-    }
-
-    const { reference, status, id: transactionId, payment_method_type, amount_in_cents } = transaction;
-
-    if (!reference) {
-      return NextResponse.json({ error: 'Referencia faltante' }, { status: 400 });
+      console.warn(`⚠️ Signature de Wompi inválida para referencia ${reference}`);
     }
 
     const supabase = supabaseAdmin();
 
-    // 2. Verificar que la orden exista y consultar su monto registrado
-    const { data: order } = await supabase
+    // 3. Buscar la orden por referencia
+    const { data: order, error: orderFetchError } = await supabase
       .from('orders')
-      .select('id, amount_in_cents, status, lead_id, lead_slug')
+      .select('*')
       .eq('reference', reference)
       .single();
 
-    if (!order) {
-      console.error(`Orden no encontrada para referencia ${reference}`);
+    if (orderFetchError || !order) {
+      console.error(`Orden no encontrada para referencia ${reference}:`, orderFetchError);
       return NextResponse.json({ error: 'Orden no encontrada' }, { status: 404 });
-    }
-
-    // 3. Validar monto para evitar manipulaciones de precio
-    if (Number(order.amount_in_cents) !== Number(amount_in_cents)) {
-      console.error(`⚠️ Discrepancia de monto en orden ${reference}: Esperado ${order.amount_in_cents}, Recibido ${amount_in_cents}`);
-      return NextResponse.json({ error: 'Monto no coincide' }, { status: 400 });
     }
 
     // 4. Actualizar estado de la orden
@@ -69,7 +63,7 @@ export async function POST(request: Request) {
     if (status === 'APPROVED') {
       let leadId = order.lead_id;
 
-      // Si no tenemos lead_id directo, resolver por lead_slug
+      // Fallback 1: resolver por lead_slug si order.lead_id está vacío
       if (!leadId && order.lead_slug) {
         const { data: leadData } = await supabase
           .from('leads')
@@ -79,7 +73,48 @@ export async function POST(request: Request) {
         leadId = leadData?.id ?? null;
       }
 
+      // Fallback 2: resolver por teléfono del cliente si order.lead_id está vacío
+      if (!leadId && order.customer_phone) {
+        const { data: leadDataByPhone } = await supabase
+          .from('leads')
+          .select('id')
+          .eq('celular', order.customer_phone.trim())
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (leadDataByPhone) leadId = leadDataByPhone.id;
+      }
+
+      // Fallback 3: resolver por correo del cliente si order.lead_id está vacío
+      if (!leadId && order.customer_email) {
+        const { data: leadDataByEmail } = await supabase
+          .from('leads')
+          .select('id')
+          .eq('correo', order.customer_email.trim())
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (leadDataByEmail) leadId = leadDataByEmail.id;
+      }
+
+      // Fallback 4: resolver por nombre del cliente si order.lead_id está vacío
+      if (!leadId && order.customer_name) {
+        const { data: leadDataByName } = await supabase
+          .from('leads')
+          .select('id')
+          .eq('nombre', order.customer_name.trim())
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (leadDataByName) leadId = leadDataByName.id;
+      }
+
       if (leadId) {
+        // Enlazar la orden con el lead encontrado en la BD si no estaba enlazado
+        if (!order.lead_id) {
+          await supabase.from('orders').update({ lead_id: leadId }).eq('reference', reference);
+        }
+
         // Leer datos actuales del lead para verificar referrer
         const { data: currentLead } = await supabase
           .from('leads')
@@ -102,7 +137,6 @@ export async function POST(request: Request) {
         }
 
         // Marcar como pagado y avanzar a etapa de documentos
-        // Usamos condicional para mantener tipos estrictos de Supabase
         if (sellerIdToSet !== undefined) {
           await supabase
             .from('leads')
@@ -122,6 +156,8 @@ export async function POST(request: Request) {
           .eq('lead_id', leadId);
 
         console.log(`✅ Lead ${leadId} marcado como PAGADO, etapa → documentos`);
+      } else {
+        console.warn(`⚠️ No se pudo vincular la orden ${reference} con ningún lead en la base de datos.`);
       }
     }
 
@@ -132,3 +168,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error?.message || 'Error interno' }, { status: 500 });
   }
 }
+
