@@ -28,8 +28,7 @@ export async function GET() {
 
     const desgloseVentas = (leads || []).map((lead) => {
       const valorDeclaracion = Number(lead.valor_declaracion) || 400000;
-      const valorConsultoria = 100000;
-      const totalVentaCliente = valorDeclaracion + valorConsultoria;
+      const totalVentaCliente = valorDeclaracion;
 
       const hasRef = Boolean(lead.referrer_id);
       const hasVend = Boolean(lead.seller_id);
@@ -41,16 +40,15 @@ export async function GET() {
       const pctRefAmt = hasRef ? refPct : 0;
       const pctVendAmt = hasVend ? vendPct : 0;
 
-      // El contador absorbe lo que no ocupe referido (5%) ni vendedor (15%) + recibe la consultoría 100% neta
+      // El contador absorbe lo que no ocupe referido (5%) ni vendedor (15%)
       const pctContador = 70 + (hasRef ? 0 : refPct) + (hasVend ? 0 : vendPct);
 
-      const amtContador = ((valorDeclaracion * pctContador) / 100) + valorConsultoria;
+      const amtContador = (valorDeclaracion * pctContador) / 100;
       const amtReferido = (valorDeclaracion * pctRefAmt) / 100;
       const amtVendedor = (valorDeclaracion * pctVendAmt) / 100;
       const amtDesarrollo = (valorDeclaracion * devPct) / 100;
       const amtPlataforma = amtDesarrollo;
 
-      // El valor principal acumulado en el panel es la suma de los valores de las declaraciones
       totalVentasBrutas += valorDeclaracion;
       totalComisionesContadores += amtContador;
       totalComisionesVendedores += amtVendedor;
@@ -64,7 +62,6 @@ export async function GET() {
         cedula: lead.cedula,
         source: lead.source || 'directo',
         valorDeclaracion,
-        valorConsultoria,
         totalVentaCliente,
         contadorNombre: (lead.contador as any)?.nombre || 'Sin asignar',
         referidoNombre: (lead.referido as any)?.nombre || 'Ninguno',

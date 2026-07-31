@@ -1082,7 +1082,6 @@ export default function AdminDashboardPage() {
                             <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#38BDF8', display: 'block' }}>
                               {formatCOP(v.valorDeclaracion)}
                             </span>
-                            <span style={{ fontSize: 10, color: t.subtext }}>+ $100k consultoría neta</span>
                           </td>
 
                           {isDevOrAdmin ? (
