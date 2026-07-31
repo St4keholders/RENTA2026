@@ -10,14 +10,14 @@ interface UserSession {
   id: string;
   nombre: string;
   email: string;
-  rol: 'desarrollador' | 'contador' | 'admin';
+  rol: 'desarrollador' | 'contador' | 'admin' | 'vendedor' | 'referido';
 }
 
 interface UsuarioData {
   id: string;
   nombre: string;
   email: string;
-  rol: 'desarrollador' | 'contador' | 'admin';
+  rol: 'desarrollador' | 'contador' | 'admin' | 'vendedor' | 'referido';
   activo: boolean;
   created_at: string;
 }
