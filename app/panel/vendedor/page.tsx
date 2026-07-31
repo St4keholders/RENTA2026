@@ -145,7 +145,7 @@ export default function PanelVendedorPage() {
   };
 
   const copyLink = (type: 'test' | 'agendar') => {
-    const base = typeof window !== 'undefined' ? window.location.origin : 'https://rentash.vercel.app';
+    const base = typeof window !== 'undefined' ? window.location.origin : 'https://mirentaya.co';
     const url = `${base}/${type}?ref=${referralSlug}`;
     navigator.clipboard.writeText(url).then(() => showToast('Link copiado ✓'));
   };
@@ -271,7 +271,7 @@ export default function PanelVendedorPage() {
                     { type: 'test' as const, label: 'Link de Test', desc: '¿Debo declarar renta?' },
                     { type: 'agendar' as const, label: 'Link de Agendar', desc: 'Agendar consulta directa' },
                   ].map(({ type, label, desc }) => {
-                    const base = typeof window !== 'undefined' ? window.location.origin : 'https://rentash.vercel.app';
+                    const base = typeof window !== 'undefined' ? window.location.origin : 'https://mirentaya.co';
                     const url = `${base}/${type}?ref=${referralSlug}`;
                     return (
                       <div key={type} style={{ background: cardBg, border: `1px solid ${border}`, borderRadius: 18, padding: 22 }}>

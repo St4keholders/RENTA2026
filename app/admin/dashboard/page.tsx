@@ -477,8 +477,8 @@ export default function AdminDashboardPage() {
 
   /* Calculate user referral links */
   const userSlug = currentUser?.referral_slug || currentUser?.nombre?.toLowerCase().replace(/[^a-z0-9]/g, '') || currentUser?.id.substring(0, 6);
-  const testLink = typeof window !== 'undefined' ? `${window.location.origin}/test?ref=${userSlug}` : `https://rentash.vercel.app/test?ref=${userSlug}`;
-  const agendarLink = typeof window !== 'undefined' ? `${window.location.origin}/agendar?ref=${userSlug}` : `https://rentash.vercel.app/agendar?ref=${userSlug}`;
+  const testLink = typeof window !== 'undefined' ? `${window.location.origin}/test?ref=${userSlug}` : `https://mirentaya.co/test?ref=${userSlug}`;
+  const agendarLink = typeof window !== 'undefined' ? `${window.location.origin}/agendar?ref=${userSlug}` : `https://mirentaya.co/agendar?ref=${userSlug}`;
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);

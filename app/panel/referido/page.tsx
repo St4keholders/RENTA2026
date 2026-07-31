@@ -122,7 +122,7 @@ export default function PanelReferidoPage() {
   const copyLink = (type: 'test' | 'agendar') => {
     const slug = profile?.referral_slug;
     if (!slug) { showToast('Sin slug asignado', false); return; }
-    const base = typeof window !== 'undefined' ? window.location.origin : 'https://rentash.vercel.app';
+    const base = typeof window !== 'undefined' ? window.location.origin : 'https://mirentaya.co';
     const url = `${base}/${type}?ref=${slug}`;
     navigator.clipboard.writeText(url).then(() => showToast('Link copiado ✓'));
   };
@@ -201,7 +201,7 @@ export default function PanelReferidoPage() {
                     { type: 'test' as const, label: 'Link de Test', desc: 'El contacto responde el test "¿Debo declarar renta?" y queda atribuido a ti', icon: '🎯' },
                     { type: 'agendar' as const, label: 'Link de Consulta', desc: 'El contacto agenda una consulta directamente y queda atribuido a ti', icon: '📅' },
                   ].map(({ type, label, desc, icon }) => {
-                    const base = typeof window !== 'undefined' ? window.location.origin : 'https://rentash.vercel.app';
+                    const base = typeof window !== 'undefined' ? window.location.origin : 'https://mirentaya.co';
                     const url = `${base}/${type}?ref=${profile.referral_slug}`;
                     return (
                       <div key={type} style={{ background: cardBg, border: `1px solid ${border}`, borderRadius: 20, padding: 24 }}>

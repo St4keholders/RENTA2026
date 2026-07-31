@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     const signature = generateIntegritySignature(reference, amountInCents, currency);
     const { publicKey } = getWompiConfig();
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://rentash.vercel.app';
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mirentaya.co';
     const redirectUrl = `${siteUrl}/pagos/respuesta?reference=${reference}`;
     const checkoutUrl =
       `https://checkout.wompi.co/p/` +

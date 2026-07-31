@@ -12,10 +12,10 @@ export interface AppSettings {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   tope: 500000,
-  pct_contador: 65,
-  pct_vendedor: 10,
-  pct_desarrollo: 5,
-  pct_ref_bajo: 10,
+  pct_contador: 70,
+  pct_vendedor: 15,
+  pct_desarrollo: 10,
+  pct_ref_bajo: 5,
   pct_ref_sobre: 5,
 };
 
