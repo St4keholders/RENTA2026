@@ -987,11 +987,11 @@ export default function AdminDashboardPage() {
             {isDevOrAdmin ? (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
                 <div style={{ background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20 }}>
-                  <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: t.subtext, textTransform: 'uppercase' }}>Ventas Brutas Totales</span>
+                  <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: t.subtext, textTransform: 'uppercase' }}>Valor Declaraciones Totales</span>
                   <div style={{ fontSize: 24, fontWeight: 800, color: '#38BDF8', fontFamily: 'monospace', marginTop: 6 }}>
                     {formatCOP(reporteVentas.resumen.totalVentasBrutas)}
                   </div>
-                  <span style={{ fontSize: 11, color: t.subtext }}>Declaraciones + Consultorías</span>
+                  <span style={{ fontSize: 11, color: t.subtext }}>Suma valor de declaraciones</span>
                 </div>
 
                 <div style={{ background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20 }}>
@@ -999,15 +999,15 @@ export default function AdminDashboardPage() {
                   <div style={{ fontSize: 24, fontWeight: 800, color: '#FBBF24', fontFamily: 'monospace', marginTop: 6 }}>
                     {formatCOP(reporteVentas.resumen.totalCostosComisiones)}
                   </div>
-                  <span style={{ fontSize: 11, color: t.subtext }}>Contadores + Vend + Ref + Dev</span>
+                  <span style={{ fontSize: 11, color: t.subtext }}>Contadores + Vendedores + Referidos</span>
                 </div>
 
                 <div style={{ background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20 }}>
-                  <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: t.subtext, textTransform: 'uppercase' }}>Utilidad Neta Plataforma</span>
+                  <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: t.subtext, textTransform: 'uppercase' }}>Desarrollo &amp; Plataforma (10%)</span>
                   <div style={{ fontSize: 24, fontWeight: 800, color: '#4ED6A1', fontFamily: 'monospace', marginTop: 6 }}>
                     {formatCOP(reporteVentas.resumen.totalUtilidadPlataforma)}
                   </div>
-                  <span style={{ fontSize: 11, color: t.subtext }}>Ganancia limpia para la empresa</span>
+                  <span style={{ fontSize: 11, color: t.subtext }}>Fijo 10% desarrollo y mantenimiento</span>
                 </div>
               </div>
             ) : (
@@ -1040,13 +1040,13 @@ export default function AdminDashboardPage() {
                   <thead>
                     <tr style={{ background: t.tableHeaderBg, borderBottom: `1px solid ${t.border}`, fontFamily: 'var(--mono)', textTransform: 'uppercase', color: t.tableHeaderColor, fontSize: 10, letterSpacing: '.08em' }}>
                       <th style={{ padding: '14px 16px', textAlign: 'left', width: '18%' }}>Cliente</th>
-                      <th style={{ padding: '14px 16px', textAlign: 'left', width: '12%' }}>Venta Total</th>
+                      <th style={{ padding: '14px 16px', textAlign: 'left', width: '14%' }}>Valor Declaración</th>
                       {isDevOrAdmin ? (
                         <>
                           <th style={{ padding: '14px 16px', textAlign: 'left', width: '15%' }}>Contador (70%)</th>
                           <th style={{ padding: '14px 16px', textAlign: 'left', width: '15%' }}>Vendedor (15%)</th>
-                          <th style={{ padding: '14px 16px', textAlign: 'left', width: '14%' }}>Referido (5%)</th>
-                          <th style={{ padding: '14px 16px', textAlign: 'left', width: '16%' }}>Desarrollo &amp; Mantenimiento (10%)</th>
+                          <th style={{ padding: '14px 16px', textAlign: 'left', width: '13%' }}>Referido (5%)</th>
+                          <th style={{ padding: '14px 16px', textAlign: 'left', width: '15%' }}>Desarrollo (10%)</th>
                           <th style={{ padding: '14px 16px', textAlign: 'right', width: '10%' }}>Acciones</th>
                         </>
                       ) : (
@@ -1077,12 +1077,12 @@ export default function AdminDashboardPage() {
                             <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: t.subtext }}>C.C. {v.cedula}</span>
                           </td>
 
-                          {/* Venta Total */}
+                          {/* Valor Declaración */}
                           <td style={{ padding: '14px 16px', textAlign: 'left' }}>
                             <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#38BDF8', display: 'block' }}>
-                              {formatCOP(v.totalVentaCliente)}
+                              {formatCOP(v.valorDeclaracion)}
                             </span>
-                            <span style={{ fontSize: 10, color: t.subtext }}>Decl: {formatCOP(v.valorDeclaracion)}</span>
+                            <span style={{ fontSize: 10, color: t.subtext }}>+ $100k consultoría neta</span>
                           </td>
 
                           {isDevOrAdmin ? (

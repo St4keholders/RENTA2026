@@ -41,16 +41,17 @@ export async function GET() {
       const pctRefAmt = hasRef ? refPct : 0;
       const pctVendAmt = hasVend ? vendPct : 0;
 
-      // El contador absorbe lo que no ocupe referido (5%) ni vendedor (15%)
+      // El contador absorbe lo que no ocupe referido (5%) ni vendedor (15%) + recibe la consultoría 100% neta
       const pctContador = 70 + (hasRef ? 0 : refPct) + (hasVend ? 0 : vendPct);
 
-      const amtContador = (valorDeclaracion * pctContador) / 100;
+      const amtContador = ((valorDeclaracion * pctContador) / 100) + valorConsultoria;
       const amtReferido = (valorDeclaracion * pctRefAmt) / 100;
       const amtVendedor = (valorDeclaracion * pctVendAmt) / 100;
       const amtDesarrollo = (valorDeclaracion * devPct) / 100;
-      const amtPlataforma = amtDesarrollo + valorConsultoria;
+      const amtPlataforma = amtDesarrollo;
 
-      totalVentasBrutas += totalVentaCliente;
+      // El valor principal acumulado en el panel es la suma de los valores de las declaraciones
+      totalVentasBrutas += valorDeclaracion;
       totalComisionesContadores += amtContador;
       totalComisionesVendedores += amtVendedor;
       totalComisionesReferidos += amtReferido;

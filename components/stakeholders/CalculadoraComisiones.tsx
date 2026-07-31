@@ -12,6 +12,7 @@ export default function CalculadoraComisiones({ isDark = true }: CalculadoraComi
   const [hasVend, setHasVend] = useState<boolean>(true);
 
   const val = Number(declaracionVal) || 0;
+  const consultoriaVal = 100000;
   const refPct = 5;
   const vendPct = 15;
   const devPct = 10;
@@ -19,14 +20,13 @@ export default function CalculadoraComisiones({ isDark = true }: CalculadoraComi
   const pctRefAmt = hasRef ? refPct : 0;
   const pctVendAmt = hasVend ? vendPct : 0;
 
-  // Contador recibe 70% base + remanentes de referido (5%) / vendedor (15%) si no participan
+  // Contador recibe 70% base sobre la declaración (+ remanentes de referido 5% / vendedor 15% si no participan) + $100.000 de consultoría netos
   const pctContador = 70 + (hasRef ? 0 : refPct) + (hasVend ? 0 : vendPct);
-  const pctPlataforma = devPct;
 
-  const amtContador = (val * pctContador) / 100;
+  const amtContador = ((val * pctContador) / 100) + consultoriaVal;
   const amtReferido = (val * pctRefAmt) / 100;
   const amtVendedor = (val * pctVendAmt) / 100;
-  const amtDesarrollo = (val * pctPlataforma) / 100;
+  const amtDesarrollo = (val * devPct) / 100;
 
   const formatCOP = (num: number) =>
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(num);
@@ -53,7 +53,7 @@ export default function CalculadoraComisiones({ isDark = true }: CalculadoraComi
             Calculadora de Rendimiento y Reparto
           </h3>
           <p style={{ margin: 0, fontSize: 12, color: subtextColor }}>
-            Simula las ganancias netas por declaración (Modelo 70 / 15 / 5 / 10)
+            Comisiones calculadas sobre el valor de la declaración + Consultoría ($100k) 100% neta para el contador
           </p>
         </div>
       </div>
@@ -92,7 +92,7 @@ export default function CalculadoraComisiones({ isDark = true }: CalculadoraComi
               onChange={(e) => setHasRef(e.target.checked)}
               style={{ width: 16, height: 16, accentColor: '#38BDF8' }}
             />
-            ¿Viene por Referido? (5%)
+            ¿Viene por Referido? (5% s/declaración)
           </label>
 
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', color: isDark ? '#FFFFFF' : '#0F172A' }}>
@@ -102,7 +102,7 @@ export default function CalculadoraComisiones({ isDark = true }: CalculadoraComi
               onChange={(e) => setHasVend(e.target.checked)}
               style={{ width: 16, height: 16, accentColor: '#38BDF8' }}
             />
-            ¿Viene por Vendedor? (Hasta 15%)
+            ¿Viene por Vendedor? (15% s/declaración)
           </label>
         </div>
       </div>
@@ -123,7 +123,9 @@ export default function CalculadoraComisiones({ isDark = true }: CalculadoraComi
         >
           <div>
             <div style={{ fontWeight: 700, fontSize: 14, color: isDark ? '#7DD3FC' : '#0369A1' }}>Contador Asignado</div>
-            <div style={{ fontSize: 11, color: subtextColor }}>Base {pctContador}% de la tarifa (70% base)</div>
+            <div style={{ fontSize: 11, color: subtextColor }}>
+              {pctContador}% s/declaración ({formatCOP((val * pctContador) / 100)}) + $100.000 consultoría neta
+            </div>
           </div>
           <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace', color: isDark ? '#38BDF8' : '#0284C7' }}>
             {formatCOP(amtContador)}
@@ -145,7 +147,7 @@ export default function CalculadoraComisiones({ isDark = true }: CalculadoraComi
           >
             <div>
               <div style={{ fontWeight: 700, fontSize: 14, color: isDark ? '#4ED6A1' : '#15803D' }}>Referido</div>
-              <div style={{ fontSize: 11, color: subtextColor }}>Comisión {refPct}% por traer el cliente</div>
+              <div style={{ fontSize: 11, color: subtextColor }}>Comisión {refPct}% sobre valor de la declaración</div>
             </div>
             <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace', color: isDark ? '#4ED6A1' : '#16A34A' }}>
               {formatCOP(amtReferido)}
@@ -168,7 +170,7 @@ export default function CalculadoraComisiones({ isDark = true }: CalculadoraComi
           >
             <div>
               <div style={{ fontWeight: 700, fontSize: 14, color: isDark ? '#FBBF24' : '#B45309' }}>Vendedor</div>
-              <div style={{ fontSize: 11, color: subtextColor }}>Comisión {vendPct}% por venta / atención</div>
+              <div style={{ fontSize: 11, color: subtextColor }}>Comisión {vendPct}% sobre valor de la declaración</div>
             </div>
             <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace', color: isDark ? '#FBBF24' : '#D97706' }}>
               {formatCOP(amtVendedor)}
@@ -189,8 +191,8 @@ export default function CalculadoraComisiones({ isDark = true }: CalculadoraComi
           }}
         >
           <div>
-            <div style={{ fontWeight: 700, fontSize: 14, color: isDark ? '#C084FC' : '#7E22CE' }}>Desarrollo &amp; Mantenimiento</div>
-            <div style={{ fontSize: 11, color: subtextColor }}>Fijo 10% por mantenimiento y plataforma</div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: isDark ? '#C084FC' : '#7E22CE' }}>Desarrollo &amp; Plataforma</div>
+            <div style={{ fontSize: 11, color: subtextColor }}>Fijo 10% sobre valor de la declaración</div>
           </div>
           <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace', color: isDark ? '#C084FC' : '#9333EA' }}>
             {formatCOP(amtDesarrollo)}
