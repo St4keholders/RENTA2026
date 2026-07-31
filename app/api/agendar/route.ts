@@ -5,7 +5,8 @@ import { resolveReferrer } from '@/lib/resolveReferrer';
 
 export async function POST(request: Request) {
   try {
-    const { nombre, correo, celular, fecha, hora, medio_contacto } = await request.json();
+    const payload = await request.json();
+    const { nombre, correo, celular, fecha, hora, medio_contacto, ref } = payload;
 
     if (!nombre || !correo || !celular || !fecha) {
       return NextResponse.json(
@@ -16,8 +17,28 @@ export async function POST(request: Request) {
 
     const supabase = supabaseAdmin();
 
-    // 1. Insertar Cita
-    const { error } = await supabase
+    // 1. Resolver referido FIRST (desde payload ref o cookie)
+    let referrerId: string | null = null;
+    let referrerRol: string | null = null;
+    try {
+      const cookieStore = await cookies();
+      const refSlug = ref || cookieStore.get('rentash_ref')?.value;
+      if (refSlug) {
+        const resolved = await resolveReferrer(refSlug);
+        if (resolved) {
+          referrerId = resolved.id;
+          referrerRol = resolved.rol;
+          console.log(`✅ [api/agendar] Referido resuelto: ${refSlug} → ID: ${referrerId} (Rol: ${referrerRol})`);
+        }
+      }
+    } catch (e) {
+      console.error('[api/agendar] Error al verificar referido:', e);
+    }
+
+    const isVendedor = referrerRol === 'vendedor';
+
+    // 2. Insertar Cita
+    const { error: citaErr } = await supabase
       .from('citas')
       .insert({
         nombre: nombre.trim(),
@@ -29,23 +50,20 @@ export async function POST(request: Request) {
         estado: 'agendado',
       });
 
-    if (error) {
-      console.error('Error al registrar cita en Supabase:', error);
-      return NextResponse.json(
-        { error: 'Error al registrar la cita en la base de datos' },
-        { status: 500 }
-      );
+    if (citaErr) {
+      console.error('Error al registrar cita en Supabase:', citaErr);
     }
 
-    // 2. Crear también registro en tabla `leads` (para CRM clásico)
+    // 3. Crear registro en tabla `leads` (para CRM con atribución de referido/vendedor)
+    let leadId: string | null = null;
     try {
-      await supabase
+      const { data: leadData, error: leadErr } = await supabase
         .from('leads')
         .insert({
           nombre: nombre.trim(),
           cedula: 'Pendiente',
           edad: 0,
-          ocupacion: 'Agendamiento Directo',
+          ocupacion: 'empleado',
           celular: celular.trim(),
           correo: correo.trim(),
           debe_declarar: true,
@@ -55,26 +73,17 @@ export async function POST(request: Request) {
           barra_creditos: 0,
           barra_movimientos: 0,
           estado: 'agendado',
-        });
-    } catch (e) {
-      console.error('Error insertando en leads:', e);
-    }
+          referrer_id: referrerId,
+          seller_id: isVendedor ? referrerId : null,
+          source: referrerId ? 'referido' : 'directo',
+        })
+        .select('id')
+        .single();
 
-    // 3. Revisar cookie de referido para atribución First-Touch
-    let referrerId: string | null = null;
-    let referrerRol: string | null = null;
-    try {
-      const cookieStore = await cookies();
-      const refSlug = cookieStore.get('rentash_ref')?.value;
-      if (refSlug) {
-        const resolved = await resolveReferrer(refSlug);
-        if (resolved) {
-          referrerId = resolved.id;
-          referrerRol = resolved.rol;
-        }
-      }
+      if (leadData) leadId = leadData.id;
+      if (leadErr) console.error('Error insertando en leads:', leadErr);
     } catch (e) {
-      console.error('Error al verificar cookie de referido:', e);
+      console.error('Error en bloque leads:', e);
     }
 
     // 4. Crear registro en `pipeline_leads` (para Pipeline Fase 2)
@@ -88,7 +97,9 @@ export async function POST(request: Request) {
           phone: celular.trim(),
           source: referrerId ? 'referido' : 'directo',
           referrer_id: referrerId,
-          stage: 'por_asignar',
+          seller_id: isVendedor ? referrerId : null,
+          lead_id: leadId,
+          stage: 'consultoria',
         })
         .select('id')
         .single();
@@ -113,7 +124,7 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, leadId });
   } catch (error) {
     console.error('Error en API agendar:', error);
     return NextResponse.json(
@@ -122,4 +133,3 @@ export async function POST(request: Request) {
     );
   }
 }
-

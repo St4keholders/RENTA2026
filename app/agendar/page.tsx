@@ -245,10 +245,11 @@ function AgendarContent() {
     setErrorMsg('');
 
     try {
+      const refParam = searchParams.get('ref') || (typeof document !== 'undefined' ? (document.cookie.match(/(?:^|; )rentash_ref=([^;]*)/)?.[1] ? decodeURIComponent(document.cookie.match(/(?:^|; )rentash_ref=([^;]*)/)![1]) : null) : null);
       const fechaConsulta = `${fecha}T${hora}:00Z`;
 
       // 1. Registrar cita y atribuir referido en backend
-      await fetch('/api/agendar', {
+      const agendarRes = await fetch('/api/agendar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -258,8 +259,10 @@ function AgendarContent() {
           fecha: fechaConsulta,
           hora,
           medio_contacto: medioContacto,
+          ref: refParam || undefined,
         }),
       });
+      const agendarData = await agendarRes.json();
 
       // 2. Generar cobro Wompi ($100.000 COP)
       const checkoutRes = await fetch('/api/checkout', {
@@ -267,6 +270,7 @@ function AgendarContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           lead_slug: leadSlug || undefined,
+          lead_id: agendarData?.leadId || undefined,
           customer_name: nombre.trim(),
           customer_email: correo.trim() || undefined,
         }),
@@ -504,30 +508,49 @@ export default function AgendarPage() {
     const ctx = cv.getContext('2d');
     if (!ctx) return;
 
-    let stars: Array<{ x: number; y: number; r: number; a: number }> = [];
-    let w = 0, h = 0;
+    const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let stars: Array<{ x: number; y: number; r: number; a: number; s: number; t: number }> = [];
+    let w = 0, h = 0, dpr = 1, raf: number | null = null;
 
     const build = () => {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
       w = window.innerWidth; h = window.innerHeight;
-      cv.width = w; cv.height = h;
-      stars = Array.from({ length: 180 }, () => ({
-        x: Math.random() * w, y: Math.random() * h,
-        r: Math.random() * 0.8 + 0.2, a: Math.random() * 0.5 + 0.1,
+      cv.width = w * dpr; cv.height = h * dpr;
+      cv.style.width = w + 'px'; cv.style.height = h + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const n = Math.round((w * h) / 10000);
+      stars = Array.from({ length: Math.min(n, 260) }, () => ({
+        x: Math.random() * w, y: Math.random() * h * 1.5,
+        r: Math.random() < 0.88 ? Math.random() * 0.75 + 0.3 : Math.random() * 1.2 + 0.8,
+        a: Math.random() * 0.5 + 0.1, s: Math.random() * 0.55 + 0.12,
+        t: Math.random() * Math.PI * 2,
       }));
     };
 
     const draw = () => {
       ctx.clearRect(0, 0, w, h);
+      const time = performance.now() / 2400;
       for (const st of stars) {
-        ctx.globalAlpha = st.a;
-        ctx.fillStyle = '#FFFFFF';
+        const tw = REDUCE ? 1 : 0.65 + 0.35 * Math.sin(time + st.t);
+        ctx.globalAlpha = st.a * tw;
+        ctx.fillStyle = st.r > 0.9 ? '#BFD4FF' : '#FFFFFF';
         ctx.beginPath(); ctx.arc(st.x, st.y, st.r, 0, 6.283); ctx.fill();
       }
+      ctx.globalAlpha = 1;
     };
 
-    build(); draw();
-    window.addEventListener('resize', build, { passive: true });
-    return () => window.removeEventListener('resize', build);
+    const loop = () => { draw(); raf = requestAnimationFrame(loop); };
+
+    build();
+    REDUCE ? draw() : loop();
+
+    const onResize = () => build();
+    window.addEventListener('resize', onResize, { passive: true });
+
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener('resize', onResize);
+    };
   }, []);
 
   return (
@@ -537,6 +560,10 @@ export default function AgendarPage() {
       justifyContent: 'center', padding: '32px 16px', position: 'relative', overflow: 'hidden',
     }}>
       <canvas ref={canvasRef} style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0 }} />
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 1, pointerEvents: 'none',
+        background: 'radial-gradient(120% 70% at 50% 0%, rgba(59,110,255,.18) 0%, rgba(0,0,0,0) 65%)',
+      }} />
 
       <header style={{ position: 'relative', zIndex: 10, marginBottom: 24, textAlign: 'center' }}>
         <Link href="/" style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 20, color: '#FFFFFF', textDecoration: 'none', letterSpacing: '-.03em' }}>
@@ -544,7 +571,7 @@ export default function AgendarPage() {
         </Link>
       </header>
 
-      <Suspense fallback={<div style={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'var(--mono)', fontSize: 13 }}>Cargando formulario...</div>}>
+      <Suspense fallback={<div style={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'var(--mono)', fontSize: 13, position: 'relative', zIndex: 10 }}>Cargando formulario...</div>}>
         <AgendarContent />
       </Suspense>
     </div>
