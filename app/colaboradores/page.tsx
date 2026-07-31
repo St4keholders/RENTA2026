@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import '@/app/stakeholders.css';
-import { calcCommissions, formatCOP } from '@/lib/commissions';
+import { formatCOP } from '@/lib/commissions';
 
 /* ── Componente de Barra de Distribución y Tarjetas de Márgenes ───── */
 function MargenesCalculator({ initialAmount = 400000 }: { initialAmount?: number }) {
@@ -10,20 +11,20 @@ function MargenesCalculator({ initialAmount = 400000 }: { initialAmount?: number
   const [hasRef, setHasRef] = useState(true);
   const [hasVend, setHasVend] = useState(true);
 
-  // Porcentajes acordados
+  // Porcentajes oficiales acordados
   const [pctContadorBase, setPctContadorBase] = useState(70);
   const [pctVendedor, setPctVendedor] = useState(15);
   const [pctReferido, setPctReferido] = useState(5);
   const [pctDesarrollo, setPctDesarrollo] = useState(10);
   const [showAdjust, setShowAdjust] = useState(false);
 
-  // El sobrante de referido/vendedor si no participan va al contador
+  // Si no hay referido o vendedor, su comisión se suma al contador asignado
   const effectiveRefPct = hasRef ? pctReferido : 0;
   const effectiveVendPct = hasVend ? pctVendedor : 0;
   const effectiveConPct = pctContadorBase + (hasRef ? 0 : pctReferido) + (hasVend ? 0 : pctVendedor);
   const effectivePlatPct = 100 - effectiveConPct - effectiveRefPct - effectiveVendPct - pctDesarrollo;
 
-  // Cálculo de montos en COP
+  // Montos en COP
   const conAmt = Math.round((amount * effectiveConPct) / 100);
   const refAmt = Math.round((amount * effectiveRefPct) / 100);
   const vendAmt = Math.round((amount * effectiveVendPct) / 100);
@@ -36,43 +37,45 @@ function MargenesCalculator({ initialAmount = 400000 }: { initialAmount?: number
   return (
     <div
       style={{
-        background: 'rgba(15, 23, 42, 0.75)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        background: 'rgba(12, 14, 20, 0.85)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        border: '1px solid rgba(255, 255, 255, 0.12)',
         borderRadius: 24,
-        padding: 'clamp(20px, 4vw, 32px)',
-        boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
+        padding: 'clamp(20px, 4vw, 36px)',
+        boxShadow: '0 24px 60px rgba(0, 0, 0, 0.7)',
+        position: 'relative',
+        zIndex: 5,
       }}
     >
-      <div style={{ marginBottom: 20 }}>
+      <div style={{ marginBottom: 24 }}>
         <h3
           style={{
             fontFamily: 'var(--display)',
             fontWeight: 700,
-            fontSize: 'clamp(1.2rem, 3vw, 1.5rem)',
-            color: '#38BDF8',
+            fontSize: 'clamp(1.3rem, 3.5vw, 1.8rem)',
+            color: '#3B6EFF',
             margin: '0 0 6px',
-            letterSpacing: '-0.02em',
+            letterSpacing: '-0.03em',
           }}
         >
           Calculadora de Rendimiento y Reparto
         </h3>
-        <p style={{ fontSize: 13, color: 'rgba(255, 255, 255, 0.55)', margin: 0 }}>
+        <p style={{ fontSize: 14, color: 'var(--dim)', margin: 0, fontFamily: 'var(--body)' }}>
           Comisiones calculadas al 100% sobre el valor del servicio de declaración de renta
         </p>
       </div>
 
       {/* Input de Valor del Servicio */}
-      <div style={{ marginBottom: 20 }}>
+      <div style={{ marginBottom: 22 }}>
         <label
           style={{
             display: 'block',
             fontFamily: 'var(--mono)',
             fontSize: 11,
-            letterSpacing: '.08em',
+            letterSpacing: '.16em',
             textTransform: 'uppercase',
-            color: 'rgba(255, 255, 255, 0.5)',
+            color: 'var(--dimmer)',
             marginBottom: 8,
           }}
         >
@@ -82,13 +85,14 @@ function MargenesCalculator({ initialAmount = 400000 }: { initialAmount?: number
           style={{
             display: 'flex',
             alignItems: 'center',
-            background: 'rgba(0, 0, 0, 0.4)',
-            border: '1px solid rgba(56, 189, 248, 0.3)',
-            borderRadius: 12,
-            padding: '12px 16px',
+            background: 'rgba(0, 0, 0, 0.6)',
+            border: '1px solid rgba(59, 110, 255, 0.4)',
+            borderRadius: 14,
+            padding: '12px 18px',
+            boxShadow: '0 0 20px rgba(59, 110, 255, 0.1)',
           }}
         >
-          <span style={{ fontFamily: 'var(--mono)', fontSize: 18, color: '#38BDF8', marginRight: 10, fontWeight: 700 }}>$</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 20, color: '#4C87FF', marginRight: 10, fontWeight: 700 }}>$</span>
           <input
             type="number"
             value={amount || ''}
@@ -100,16 +104,16 @@ function MargenesCalculator({ initialAmount = 400000 }: { initialAmount?: number
               border: 0,
               outline: 0,
               fontFamily: 'var(--mono)',
-              fontSize: 'clamp(1.2rem, 3vw, 1.6rem)',
+              fontSize: 'clamp(1.4rem, 3.5vw, 1.8rem)',
               fontWeight: 700,
-              color: '#38BDF8',
+              color: '#FFFFFF',
             }}
           />
         </div>
       </div>
 
       {/* Checkboxes de Escenarios */}
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 26 }}>
         <label
           style={{
             display: 'flex',
@@ -118,12 +122,13 @@ function MargenesCalculator({ initialAmount = 400000 }: { initialAmount?: number
             cursor: 'pointer',
             fontSize: 14,
             fontWeight: 600,
-            color: hasRef ? '#4ADE80' : 'rgba(255, 255, 255, 0.4)',
-            background: hasRef ? 'rgba(74, 222, 128, 0.08)' : 'rgba(255, 255, 255, 0.03)',
-            border: `1px solid ${hasRef ? 'rgba(74, 222, 128, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
-            borderRadius: 10,
-            padding: '10px 14px',
-            transition: 'all .2s',
+            fontFamily: 'var(--display)',
+            color: hasRef ? '#4ADE80' : 'var(--dimmer)',
+            background: hasRef ? 'rgba(74, 222, 128, 0.1)' : 'rgba(255, 255, 255, 0.02)',
+            border: `1px solid ${hasRef ? 'rgba(74, 222, 128, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`,
+            borderRadius: 12,
+            padding: '12px 16px',
+            transition: 'all .25s var(--ease)',
           }}
         >
           <input
@@ -143,12 +148,13 @@ function MargenesCalculator({ initialAmount = 400000 }: { initialAmount?: number
             cursor: 'pointer',
             fontSize: 14,
             fontWeight: 600,
-            color: hasVend ? '#FACC15' : 'rgba(255, 255, 255, 0.4)',
-            background: hasVend ? 'rgba(250, 204, 21, 0.08)' : 'rgba(255, 255, 255, 0.03)',
-            border: `1px solid ${hasVend ? 'rgba(250, 204, 21, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
-            borderRadius: 10,
-            padding: '10px 14px',
-            transition: 'all .2s',
+            fontFamily: 'var(--display)',
+            color: hasVend ? '#FACC15' : 'var(--dimmer)',
+            background: hasVend ? 'rgba(250, 204, 21, 0.1)' : 'rgba(255, 255, 255, 0.02)',
+            border: `1px solid ${hasVend ? 'rgba(250, 204, 21, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`,
+            borderRadius: 12,
+            padding: '12px 16px',
+            transition: 'all .25s var(--ease)',
           }}
         >
           <input
@@ -165,56 +171,57 @@ function MargenesCalculator({ initialAmount = 400000 }: { initialAmount?: number
       <div
         style={{
           display: 'flex',
-          height: 28,
-          borderRadius: 8,
+          height: 32,
+          borderRadius: 10,
           overflow: 'hidden',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          marginBottom: 20,
-          background: 'rgba(0,0,0,0.3)',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
+          marginBottom: 24,
+          background: 'rgba(0,0,0,0.5)',
         }}
       >
-        <div style={{ width: `${effectiveConPct}%`, background: '#0284C7', transition: 'width 0.3s', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, fontFamily: 'var(--mono)', color: '#fff' }}>
+        <div style={{ width: `${effectiveConPct}%`, background: '#0284C7', transition: 'width 0.35s var(--ease)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, fontFamily: 'var(--mono)', color: '#fff' }}>
           {effectiveConPct}%
         </div>
         {hasRef && (
-          <div style={{ width: `${effectiveRefPct}%`, background: '#16A34A', transition: 'width 0.3s', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, fontFamily: 'var(--mono)', color: '#fff' }}>
+          <div style={{ width: `${effectiveRefPct}%`, background: '#16A34A', transition: 'width 0.35s var(--ease)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, fontFamily: 'var(--mono)', color: '#fff' }}>
             {effectiveRefPct}%
           </div>
         )}
         {hasVend && (
-          <div style={{ width: `${effectiveVendPct}%`, background: '#CA8A04', transition: 'width 0.3s', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, fontFamily: 'var(--mono)', color: '#fff' }}>
+          <div style={{ width: `${effectiveVendPct}%`, background: '#CA8A04', transition: 'width 0.35s var(--ease)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, fontFamily: 'var(--mono)', color: '#fff' }}>
             {effectiveVendPct}%
           </div>
         )}
-        <div style={{ width: `${desAndPlatPct}%`, background: '#9333EA', transition: 'width 0.3s', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, fontFamily: 'var(--mono)', color: '#fff' }}>
+        <div style={{ width: `${desAndPlatPct}%`, background: '#9333EA', transition: 'width 0.35s var(--ease)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, fontFamily: 'var(--mono)', color: '#fff' }}>
           {desAndPlatPct}%
         </div>
       </div>
 
-      {/* Tarjetas de Reparto Exactas */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* Tarjetas de Reparto Exactas (Mockup Admin Theme) */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {/* Contador */}
         <div
           style={{
-            background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.18) 0%, rgba(14, 116, 144, 0.12) 100%)',
-            border: '1px solid rgba(56, 189, 248, 0.35)',
-            borderRadius: 14,
-            padding: '16px 20px',
+            background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.22) 0%, rgba(14, 116, 144, 0.15) 100%)',
+            border: '1px solid rgba(56, 189, 248, 0.4)',
+            borderRadius: 16,
+            padding: '18px 22px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: 16,
+            boxShadow: '0 4px 20px rgba(2, 132, 199, 0.1)',
           }}
         >
           <div>
-            <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 16, color: '#7DD3FC' }}>
+            <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 17, color: '#7DD3FC' }}>
               Contador Asignado
             </div>
-            <div style={{ fontSize: 12, color: 'rgba(125, 211, 252, 0.75)', marginTop: 2 }}>
+            <div style={{ fontSize: 13, color: 'rgba(125, 211, 252, 0.8)', marginTop: 3 }}>
               Base {effectiveConPct}% del valor del servicio
             </div>
           </div>
-          <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 'clamp(1.1rem, 2.5vw, 1.4rem)', color: '#38BDF8', textAlign: 'right' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 'clamp(1.2rem, 3vw, 1.5rem)', color: '#38BDF8', textAlign: 'right' }}>
             {formatCOP(conAmt)}
           </div>
         </div>
@@ -222,27 +229,28 @@ function MargenesCalculator({ initialAmount = 400000 }: { initialAmount?: number
         {/* Referido */}
         <div
           style={{
-            background: 'linear-gradient(135deg, rgba(22, 163, 74, 0.18) 0%, rgba(21, 128, 61, 0.12) 100%)',
-            border: '1px solid rgba(74, 222, 128, 0.35)',
-            borderRadius: 14,
-            padding: '16px 20px',
+            background: 'linear-gradient(135deg, rgba(22, 163, 74, 0.22) 0%, rgba(21, 128, 61, 0.15) 100%)',
+            border: '1px solid rgba(74, 222, 128, 0.4)',
+            borderRadius: 16,
+            padding: '18px 22px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: 16,
-            opacity: hasRef ? 1 : 0.45,
-            transition: 'opacity 0.2s',
+            opacity: hasRef ? 1 : 0.4,
+            transition: 'opacity 0.25s',
+            boxShadow: hasRef ? '0 4px 20px rgba(22, 163, 74, 0.1)' : 'none',
           }}
         >
           <div>
-            <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 16, color: '#86EFAC' }}>
+            <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 17, color: '#86EFAC' }}>
               Referido
             </div>
-            <div style={{ fontSize: 12, color: 'rgba(134, 239, 172, 0.75)', marginTop: 2 }}>
+            <div style={{ fontSize: 13, color: 'rgba(134, 239, 172, 0.8)', marginTop: 3 }}>
               {hasRef ? `Comisión ${pctReferido}% por traer el cliente` : 'No participó (sumado al contador)'}
             </div>
           </div>
-          <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 'clamp(1.1rem, 2.5vw, 1.4rem)', color: '#4ADE80', textAlign: 'right' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 'clamp(1.2rem, 3vw, 1.5rem)', color: '#4ADE80', textAlign: 'right' }}>
             {formatCOP(refAmt)}
           </div>
         </div>
@@ -250,27 +258,28 @@ function MargenesCalculator({ initialAmount = 400000 }: { initialAmount?: number
         {/* Vendedor */}
         <div
           style={{
-            background: 'linear-gradient(135deg, rgba(202, 138, 4, 0.18) 0%, rgba(161, 98, 7, 0.12) 100%)',
-            border: '1px solid rgba(250, 204, 21, 0.35)',
-            borderRadius: 14,
-            padding: '16px 20px',
+            background: 'linear-gradient(135deg, rgba(202, 138, 4, 0.22) 0%, rgba(161, 98, 7, 0.15) 100%)',
+            border: '1px solid rgba(250, 204, 21, 0.4)',
+            borderRadius: 16,
+            padding: '18px 22px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: 16,
-            opacity: hasVend ? 1 : 0.45,
-            transition: 'opacity 0.2s',
+            opacity: hasVend ? 1 : 0.4,
+            transition: 'opacity 0.25s',
+            boxShadow: hasVend ? '0 4px 20px rgba(202, 138, 4, 0.1)' : 'none',
           }}
         >
           <div>
-            <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 16, color: '#FDE047' }}>
+            <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 17, color: '#FDE047' }}>
               Vendedor
             </div>
-            <div style={{ fontSize: 12, color: 'rgba(253, 224, 71, 0.75)', marginTop: 2 }}>
+            <div style={{ fontSize: 13, color: 'rgba(253, 224, 71, 0.8)', marginTop: 3 }}>
               {hasVend ? `Comisión ${pctVendedor}% por venta / atención` : 'No participó (sumado al contador)'}
             </div>
           </div>
-          <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 'clamp(1.1rem, 2.5vw, 1.4rem)', color: '#FACC15', textAlign: 'right' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 'clamp(1.2rem, 3vw, 1.5rem)', color: '#FACC15', textAlign: 'right' }}>
             {formatCOP(vendAmt)}
           </div>
         </div>
@@ -278,52 +287,53 @@ function MargenesCalculator({ initialAmount = 400000 }: { initialAmount?: number
         {/* Desarrollo & Plataforma */}
         <div
           style={{
-            background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.18) 0%, rgba(109, 40, 217, 0.12) 100%)',
-            border: '1px solid rgba(192, 132, 252, 0.35)',
-            borderRadius: 14,
-            padding: '16px 20px',
+            background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.22) 0%, rgba(109, 40, 217, 0.15) 100%)',
+            border: '1px solid rgba(192, 132, 252, 0.4)',
+            borderRadius: 16,
+            padding: '18px 22px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: 16,
+            boxShadow: '0 4px 20px rgba(147, 51, 234, 0.1)',
           }}
         >
           <div>
-            <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 16, color: '#E9D5FF' }}>
+            <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 17, color: '#E9D5FF' }}>
               Desarrollo & Plataforma
             </div>
-            <div style={{ fontSize: 12, color: 'rgba(233, 213, 255, 0.75)', marginTop: 2 }}>
+            <div style={{ fontSize: 13, color: 'rgba(233, 213, 255, 0.8)', marginTop: 3 }}>
               Fijo {desAndPlatPct}% por mantenimiento y plataforma
             </div>
           </div>
-          <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 'clamp(1.1rem, 2.5vw, 1.4rem)', color: '#C084FC', textAlign: 'right' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 'clamp(1.2rem, 3vw, 1.5rem)', color: '#C084FC', textAlign: 'right' }}>
             {formatCOP(desAndPlatAmt)}
           </div>
         </div>
       </div>
 
-      {/* Ajustador opcional de simulaciones */}
-      <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
+      {/* Ajustador de porcentajes opcional */}
+      <div style={{ marginTop: 24, paddingTop: 18, borderTop: '1px dashed rgba(255,255,255,0.12)' }}>
         <button
           onClick={() => setShowAdjust(!showAdjust)}
           style={{
             background: 'transparent',
             border: 0,
-            color: 'rgba(255,255,255,0.6)',
+            color: 'var(--dim)',
             fontSize: 13,
             cursor: 'pointer',
             fontFamily: 'var(--display)',
             fontWeight: 600,
             display: 'flex',
             alignItems: 'center',
-            gap: 6,
+            gap: 8,
           }}
         >
-          {showAdjust ? '▲ Ocultar simulador de porcentajes' : '▼ Ajustar porcentajes (simular otros escenarios)'}
+          {showAdjust ? '▲ Ocultar ajuste de porcentajes' : '▼ Ajustar porcentajes (simular otros escenarios)'}
         </button>
 
         {showAdjust && (
-          <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
             {[
               { label: 'Contador (base)', val: pctContadorBase, set: setPctContadorBase },
               { label: 'Vendedor', val: pctVendedor, set: setPctVendedor },
@@ -331,15 +341,15 @@ function MargenesCalculator({ initialAmount = 400000 }: { initialAmount?: number
               { label: 'Desarrollo web', val: pctDesarrollo, set: setPctDesarrollo },
             ].map(({ label, val, set }) => (
               <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: 'rgba(255,255,255,0.6)' }}>{label}</span>
-                <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, overflow: 'hidden' }}>
+                <span style={{ color: 'var(--dim)' }}>{label}</span>
+                <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, overflow: 'hidden' }}>
                   <input
                     type="number"
                     value={val}
                     onChange={(e) => set(Number(e.target.value) || 0)}
-                    style={{ width: 60, border: 0, background: 'transparent', padding: '6px 8px', textAlign: 'right', color: '#fff', fontFamily: 'var(--mono)', fontSize: 13 }}
+                    style={{ width: 64, border: 0, background: 'transparent', padding: '6px 10px', textAlign: 'right', color: '#fff', fontFamily: 'var(--mono)', fontSize: 13 }}
                   />
-                  <span style={{ paddingRight: 8, color: 'rgba(255,255,255,0.4)', fontFamily: 'var(--mono)', fontSize: 12 }}>%</span>
+                  <span style={{ paddingRight: 10, color: 'var(--dimmer)', fontFamily: 'var(--mono)', fontSize: 12 }}>%</span>
                 </div>
               </div>
             ))}
@@ -357,6 +367,18 @@ export default function ColaboradoresPage() {
   const [cVend, setCVend] = useState(true);
   const [cRef, setCRef] = useState(true);
 
+  // Configurar fondo oscuro global
+  useEffect(() => {
+    const prevBg = document.body.style.backgroundColor;
+    const prevColor = document.body.style.color;
+    document.body.style.backgroundColor = '#000000';
+    document.body.style.color = '#FFFFFF';
+    return () => {
+      document.body.style.backgroundColor = prevBg;
+      document.body.style.color = prevColor;
+    };
+  }, []);
+
   // Animaciones reveal
   const revealRefs = useRef<HTMLElement[]>([]);
   useEffect(() => {
@@ -364,7 +386,7 @@ export default function ColaboradoresPage() {
       (entries) => {
         entries.forEach((e) => {
           if (e.isIntersecting) {
-            e.target.classList.add('col-in');
+            e.target.classList.add('is-in');
             obs.unobserve(e.target);
           }
         });
@@ -377,20 +399,15 @@ export default function ColaboradoresPage() {
 
   const reveal = (el: HTMLElement | null, i = 0) => {
     if (el && !revealRefs.current.includes(el)) {
-      (el as any).style.transitionDelay = `${Math.min(i, 6) * 0.05}s`;
+      (el as any).style.transitionDelay = `${Math.min(i, 6) * 0.06}s`;
       revealRefs.current.push(el);
     }
   };
 
-  const bg = '#07090E';
-  const border = 'rgba(255,255,255,0.08)';
-  const cardBg = 'rgba(255,255,255,0.03)';
-  const sub = 'rgba(255,255,255,0.6)';
-
   const ROLE_COLORS: Record<string, string> = {
     referido: '#4ADE80',
     vendedor: '#FACC15',
-    contador: '#38BDF8',
+    contador: '#3B6EFF',
   };
 
   const TAB_COPY: Record<string, { title: string; pct: string; fn: string; note: string }> = {
@@ -431,268 +448,338 @@ export default function ColaboradoresPage() {
   const currentComm = calculateRoleCommission();
 
   return (
-    <div style={{ minHeight: '100vh', background: bg, color: '#fff', fontFamily: 'var(--body)', overflowX: 'hidden' }}>
-      <style>{`
-        .col-reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1); }
-        .col-in { opacity: 1; transform: none; }
-        @media (prefers-reduced-motion: reduce) { .col-reveal { opacity: 1; transform: none; transition: none; } }
-        .role-tab { transition: all .22s; cursor: pointer; }
-        .role-tab:hover { transform: translateY(-2px); }
-        input[type=range] { width: 100%; cursor: pointer; height: 6px; border-radius: 99px; }
-      `}</style>
+    <div style={{ minHeight: '100vh', background: '#000000', color: '#FFFFFF', position: 'relative', overflowX: 'hidden' }}>
+      {/* Atmósfera Cósmica Idéntica a la Landing Page */}
+      <div className="veil" />
 
-      {/* ── HERO ─── */}
-      <header style={{ maxWidth: 840, margin: '0 auto', padding: 'clamp(70px,10vw,110px) clamp(20px,5vw,40px) clamp(30px,5vw,50px)' }}>
-        <div
-          ref={(el) => reveal(el as any, 0)}
-          className="col-reveal"
-          style={{
-            fontFamily: 'var(--mono)',
-            fontSize: 11,
-            letterSpacing: '.22em',
-            textTransform: 'uppercase',
-            color: '#38BDF8',
-            marginBottom: 14,
-            fontWeight: 700,
-          }}
-        >
-          Temporada de renta 2026
+      {/* HEADER NAVBAR OFICIAL */}
+      <nav
+        className="nav stuck"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 60,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '14px var(--pad)',
+          background: 'rgba(0,0,0,0.85)',
+          backdropFilter: 'blur(16px)',
+          borderBottom: '1px solid var(--line-soft)',
+        }}
+      >
+        <Link href="/" className="brand" style={{ fontFamily: 'var(--mono)', fontSize: 12, letterSpacing: '.28em', fontWeight: 600, color: '#fff' }}>
+          STAKEHOLDERS <i style={{ display: 'inline-block', width: 5, height: 5, borderRadius: '50%', background: '#3B6EFF', marginLeft: 6, verticalAlign: 'middle' }} />
+        </Link>
+        <div className="nav-links" style={{ display: 'flex', gap: 24, fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '.18em', textTransform: 'uppercase', color: 'var(--dim)' }}>
+          <Link href="/#funcionamiento" style={{ color: 'var(--dim)', transition: 'color .2s' }}>CÓMO FUNCIONA</Link>
+          <Link href="/colaboradores" style={{ color: '#FFFFFF', fontWeight: 600 }}>PROPUESTA</Link>
+          <Link href="/#topes" style={{ color: 'var(--dim)', transition: 'color .2s' }}>TOPES</Link>
         </div>
-        <h1
-          ref={(el) => reveal(el as any, 1)}
-          className="col-reveal"
-          style={{
-            fontFamily: 'var(--display)',
-            fontWeight: 700,
-            fontSize: 'clamp(2.2rem, 7vw, 3.8rem)',
-            lineHeight: 1.08,
-            letterSpacing: '-.04em',
-            margin: '0 0 18px',
-          }}
-        >
-          Colabora con nosotros<br />y gana con cada declaración.
-        </h1>
-        <p
-          ref={(el) => reveal(el as any, 2)}
-          className="col-reveal"
-          style={{ fontSize: 'clamp(1rem, 2.3vw, 1.2rem)', color: sub, maxWidth: '60ch', lineHeight: 1.6 }}
-        >
-          Hay tres formas de sumarte (referido, vendedor o contador) y cada una tiene su propia comisión. Elige la tuya y calcula cuánto ganarías.
-        </p>
-      </header>
-
-      {/* ── CÓMO FUNCIONA ─── */}
-      <section style={{ maxWidth: 840, margin: '0 auto', padding: 'clamp(40px,6vw,60px) clamp(20px,5vw,40px)', borderTop: `1px solid ${border}` }}>
-        <div ref={(el) => reveal(el as any, 0)} className="col-reveal" style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '.2em', textTransform: 'uppercase', color: '#38BDF8', marginBottom: 8, fontWeight: 700 }}>
-          Cómo funciona
-        </div>
-        <h2 ref={(el) => reveal(el as any, 1)} className="col-reveal" style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'clamp(1.5rem,4vw,2.2rem)', letterSpacing: '-.03em', margin: '0 0 14px' }}>
-          Así acompañamos cada declaración.
-        </h2>
-        <p ref={(el) => reveal(el as any, 2)} className="col-reveal" style={{ fontSize: 15, color: sub, maxWidth: '65ch', lineHeight: 1.6, marginBottom: 28 }}>
-          Antes de hablar de comisiones, esto es lo que vive cada cliente en la plataforma: cinco pasos desde que agenda hasta que recibe su declaración lista. Tu comisión depende de en qué parte de este proceso participas.
-        </p>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
-          {[
-            { n: '01', t: 'Consultoría', p: '$100.000', d: 'Revisamos si la persona está obligada a declarar. Se cobra aparte de la declaración.' },
-            { n: '02', t: 'Documentos', d: 'Reunimos con el cliente todo lo necesario para declarar.' },
-            { n: '03', t: 'Anticipo', d: 'El cliente paga el 50% para arrancar el trabajo.' },
-            { n: '04', t: 'Declaración', d: 'Un contador aliado realiza la declaración de renta.' },
-            { n: '05', t: 'Entrega', d: 'Entregamos la declaración y el cliente paga el 50% final.' },
-          ].map((step, i) => (
-            <div
-              key={step.n}
-              ref={(el) => reveal(el as any, i)}
-              className="col-reveal"
-              style={{
-                background: cardBg,
-                border: `1px solid ${border}`,
-                borderRadius: 16,
-                padding: '18px 16px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-              }}
-            >
-              <div>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 700, color: '#38BDF8', display: 'block', marginBottom: 6 }}>
-                  {step.n}
-                </span>
-                <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 15, marginBottom: 4 }}>
-                  {step.t}
-                </div>
-                {step.p && (
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 700, color: '#FACC15', marginBottom: 6 }}>
-                    {step.p}
-                  </div>
-                )}
-                <div style={{ fontSize: 12.5, color: sub, lineHeight: 1.45 }}>
-                  {step.d}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── ELIGE TU ROL ─── */}
-      <section style={{ maxWidth: 840, margin: '0 auto', padding: 'clamp(40px,6vw,60px) clamp(20px,5vw,40px)', borderTop: `1px solid ${border}` }}>
-        <div ref={(el) => reveal(el as any, 0)} className="col-reveal" style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '.2em', textTransform: 'uppercase', color: '#38BDF8', marginBottom: 8, fontWeight: 700 }}>
-          Elige tu rol
-        </div>
-        <h2 ref={(el) => reveal(el as any, 1)} className="col-reveal" style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'clamp(1.5rem,4vw,2.2rem)', letterSpacing: '-.03em', margin: '0 0 14px' }}>
-          ¿Cómo quieres colaborar?
-        </h2>
-        <p ref={(el) => reveal(el as any, 2)} className="col-reveal" style={{ fontSize: 15, color: sub, maxWidth: '65ch', lineHeight: 1.6, marginBottom: 28 }}>
-          Cada rol cobra sobre el valor de la declaración (la consultoría va aparte). Y no son excluyentes: puedes cumplir varios a la vez y sumar las comisiones. Un contador que además trae y atiende a su propio cliente se lleva casi todo.
-        </p>
-
-        {/* Pestañas de Roles */}
-        <div ref={(el) => reveal(el as any, 3)} className="col-reveal" style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
-          {(['referido', 'vendedor', 'contador'] as const).map((role) => {
-            const active = activeRole === role;
-            const color = ROLE_COLORS[role];
-            const info = TAB_COPY[role];
-            return (
-              <button
-                key={role}
-                className="role-tab"
-                onClick={() => setActiveRole(role)}
-                style={{
-                  flex: 1,
-                  borderRadius: 16,
-                  padding: '16px 12px',
-                  border: `1px solid ${active ? color : border}`,
-                  background: active ? `${color}18` : cardBg,
-                  textAlign: 'center',
-                  fontFamily: 'var(--body)',
-                  color: active ? color : sub,
-                }}
-              >
-                <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 17 }}>{info.title}</div>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 12, marginTop: 4, fontWeight: 700, opacity: 0.85 }}>{info.pct}</div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Panel Simulador */}
-        <div
-          ref={(el) => reveal(el as any, 4)}
-          className="col-reveal"
-          style={{
-            background: cardBg,
-            border: `1px solid ${border}`,
-            borderRadius: 20,
-            padding: 'clamp(20px, 4vw, 28px)',
-          }}
-        >
-          <p style={{ fontSize: 14.5, color: 'rgba(255,255,255,0.8)', margin: '0 0 22px', lineHeight: 1.6 }}>
-            {TAB_COPY[activeRole].fn}
-          </p>
-
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <label style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: sub }}>
-                Valor de la declaración
-              </label>
-              <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: '1.4rem', color: ROLE_COLORS[activeRole] }}>
-                {formatCOP(sliderVal)}
-              </div>
-            </div>
-            <input
-              type="range"
-              min={100000}
-              max={2000000}
-              step={50000}
-              value={sliderVal}
-              onChange={(e) => setSliderVal(Number(e.target.value))}
-              style={{ accentColor: ROLE_COLORS[activeRole] }}
-            />
-          </div>
-
-          {activeRole === 'contador' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20, background: 'rgba(0,0,0,0.3)', padding: 14, borderRadius: 12, border: `1px solid ${border}` }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 14, color: cVend ? '#fff' : sub }}>
-                <input
-                  type="checkbox"
-                  checked={cVend}
-                  onChange={(e) => setCVend(e.target.checked)}
-                  style={{ accentColor: ROLE_COLORS.vendedor, width: 16, height: 16 }}
-                />
-                También cerré la venta (+15%)
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 14, color: cRef ? '#fff' : sub }}>
-                <input
-                  type="checkbox"
-                  checked={cRef}
-                  onChange={(e) => setCRef(e.target.checked)}
-                  style={{ accentColor: ROLE_COLORS.referido, width: 16, height: 16 }}
-                />
-                También traje al cliente (+5% referido)
-              </label>
-            </div>
-          )}
-
-          {/* Resultado Gran Número */}
-          <div
+        <div className="nav-actions" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Link
+            href="/panel/vendedor"
             style={{
-              borderRadius: 16,
-              padding: '20px 24px',
-              background: `${ROLE_COLORS[activeRole]}15`,
-              border: `1px solid ${ROLE_COLORS[activeRole]}40`,
-              marginBottom: 16,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '7px 16px',
+              borderRadius: 999,
+              border: '1px solid rgba(255,255,255,0.18)',
+              background: 'rgba(255,255,255,0.04)',
+              color: '#FFF',
+              fontFamily: 'var(--mono)',
+              fontSize: 12,
+              letterSpacing: '.05em',
+              transition: 'all .2s',
             }}
           >
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', color: ROLE_COLORS[activeRole], opacity: 0.8, marginBottom: 4 }}>
-              Tu comisión
-            </div>
-            <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'clamp(2rem, 5vw, 2.8rem)', color: ROLE_COLORS[activeRole], letterSpacing: '-.03em' }}>
-              {formatCOP(currentComm.amt)}
-            </div>
-            <div style={{ fontSize: 13, color: sub, marginTop: 4 }}>
-              {currentComm.sub}
-            </div>
+            LOGIN
+          </Link>
+          <Link
+            href="/agendar"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '8px 18px',
+              borderRadius: 999,
+              background: '#FFFFFF',
+              color: '#000000',
+              fontFamily: 'var(--display)',
+              fontWeight: 700,
+              fontSize: 13,
+              letterSpacing: '-.01em',
+              transition: 'transform .2s var(--ease)',
+            }}
+          >
+            Agendar consulta
+          </Link>
+        </div>
+      </nav>
+
+      {/* CONTENIDO PRINCIPAL */}
+      <main style={{ position: 'relative', zIndex: 2, paddingTop: 100 }}>
+        {/* ── HERO ─── */}
+        <header style={{ maxWidth: 900, margin: '0 auto', padding: 'clamp(60px,9vw,100px) var(--pad) clamp(30px,5vw,50px)' }}>
+          <div
+            ref={(el) => reveal(el as any, 0)}
+            className="fade"
+            style={{
+              fontFamily: 'var(--mono)',
+              fontSize: 11,
+              letterSpacing: '.24em',
+              textTransform: 'uppercase',
+              color: '#4C87FF',
+              marginBottom: 16,
+              fontWeight: 600,
+            }}
+          >
+            Temporada de renta 2026
+          </div>
+          <h1
+            ref={(el) => reveal(el as any, 1)}
+            className="fade"
+            style={{
+              fontFamily: 'var(--display)',
+              fontWeight: 700,
+              fontSize: 'clamp(2.4rem, 7.5vw, 4.2rem)',
+              lineHeight: 1.05,
+              letterSpacing: '-.045em',
+              margin: '0 0 20px',
+            }}
+          >
+            Colabora con nosotros<br />y gana con cada declaración.
+          </h1>
+          <p
+            ref={(el) => reveal(el as any, 2)}
+            className="fade lead"
+            style={{ fontSize: 'clamp(1.05rem, 2.3vw, 1.25rem)', color: 'var(--dim)', maxWidth: '60ch', lineHeight: 1.6 }}
+          >
+            Hay tres formas de sumarte (referido, vendedor o contador) y cada una tiene su propia comisión. Elige la tuya y calcula cuánto ganarías.
+          </p>
+        </header>
+
+        {/* ── CÓMO FUNCIONA ─── */}
+        <section style={{ maxWidth: 900, margin: '0 auto', padding: 'clamp(45px,6vw,65px) var(--pad)', borderTop: '1px solid var(--line-soft)' }}>
+          <div ref={(el) => reveal(el as any, 0)} className="fade" style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '.22em', textTransform: 'uppercase', color: '#4C87FF', marginBottom: 8, fontWeight: 600 }}>
+            Cómo funciona
+          </div>
+          <h2 ref={(el) => reveal(el as any, 1)} className="fade" style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'clamp(1.6rem,4.5vw,2.4rem)', letterSpacing: '-.04em', margin: '0 0 16px' }}>
+            Así acompañamos cada declaración.
+          </h2>
+          <p ref={(el) => reveal(el as any, 2)} className="fade lead" style={{ fontSize: 15, color: 'var(--dim)', maxWidth: '64ch', lineHeight: 1.6, marginBottom: 32 }}>
+            Antes de hablar de comisiones, esto es lo que vive cada cliente en la plataforma: cinco pasos desde que agenda hasta que recibe su declaración lista. Tu comisión depende de en qué parte de este proceso participas.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14 }}>
+            {[
+              { n: '01', t: 'Consultoría', p: '$100.000', d: 'Revisamos si la persona está obligada a declarar. Se cobra aparte de la declaración.' },
+              { n: '02', t: 'Documentos', d: 'Reunimos con el cliente todo lo necesario para declarar.' },
+              { n: '03', t: 'Anticipo', d: 'El cliente paga el 50% para arrancar el trabajo.' },
+              { n: '04', t: 'Declaración', d: 'Un contador aliado realiza la declaración de renta.' },
+              { n: '05', t: 'Entrega', d: 'Entregamos la declaración y el cliente paga el 50% final.' },
+            ].map((step, i) => (
+              <div
+                key={step.n}
+                ref={(el) => reveal(el as any, i)}
+                className="fade"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid var(--line)',
+                  borderRadius: 18,
+                  padding: '20px 18px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  transition: 'border-color .25s var(--ease)',
+                }}
+              >
+                <div>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 700, color: '#4C87FF', display: 'block', marginBottom: 6 }}>
+                    {step.n}
+                  </span>
+                  <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 16, marginBottom: 4 }}>
+                    {step.t}
+                  </div>
+                  {step.p && (
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 700, color: '#FACC15', marginBottom: 6 }}>
+                      {step.p}
+                    </div>
+                  )}
+                  <div style={{ fontSize: 13, color: 'var(--dim)', lineHeight: 1.45 }}>
+                    {step.d}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── ELIGE TU ROL ─── */}
+        <section style={{ maxWidth: 900, margin: '0 auto', padding: 'clamp(45px,6vw,65px) var(--pad)', borderTop: '1px solid var(--line-soft)' }}>
+          <div ref={(el) => reveal(el as any, 0)} className="fade" style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '.22em', textTransform: 'uppercase', color: '#4C87FF', marginBottom: 8, fontWeight: 600 }}>
+            Elige tu rol
+          </div>
+          <h2 ref={(el) => reveal(el as any, 1)} className="fade" style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'clamp(1.6rem,4.5vw,2.4rem)', letterSpacing: '-.04em', margin: '0 0 16px' }}>
+            ¿Cómo quieres colaborar?
+          </h2>
+          <p ref={(el) => reveal(el as any, 2)} className="fade lead" style={{ fontSize: 15, color: 'var(--dim)', maxWidth: '64ch', lineHeight: 1.6, marginBottom: 32 }}>
+            Cada rol cobra sobre el valor de la declaración (la consultoría va aparte). Y no son excluyentes: puedes cumplir varios a la vez y sumar las comisiones. Un contador que además trae y atiende a su propio cliente se lleva casi todo.
+          </p>
+
+          {/* Pestañas de Roles */}
+          <div ref={(el) => reveal(el as any, 3)} className="fade" style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+            {(['referido', 'vendedor', 'contador'] as const).map((role) => {
+              const active = activeRole === role;
+              const color = ROLE_COLORS[role];
+              const info = TAB_COPY[role];
+              return (
+                <button
+                  key={role}
+                  className="role-tab"
+                  onClick={() => setActiveRole(role)}
+                  style={{
+                    flex: 1,
+                    borderRadius: 18,
+                    padding: '18px 14px',
+                    border: `1px solid ${active ? color : 'var(--line)'}`,
+                    background: active ? `${color}1A` : 'rgba(255, 255, 255, 0.02)',
+                    textAlign: 'center',
+                    fontFamily: 'var(--body)',
+                    color: active ? color : 'var(--dim)',
+                    boxShadow: active ? `0 0 24px ${color}20` : 'none',
+                  }}
+                >
+                  <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 18 }}>{info.title}</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 12, marginTop: 4, fontWeight: 700, opacity: 0.9 }}>{info.pct}</div>
+                </button>
+              );
+            })}
           </div>
 
-          <p style={{ fontSize: 13, color: sub, margin: 0, lineHeight: 1.5 }}>
-            {TAB_COPY[activeRole].note}
+          {/* Panel Simulador */}
+          <div
+            ref={(el) => reveal(el as any, 4)}
+            className="fade"
+            style={{
+              background: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid var(--line)',
+              borderRadius: 24,
+              padding: 'clamp(22px, 4.5vw, 32px)',
+            }}
+          >
+            <p style={{ fontSize: 15, color: '#E2E8F0', margin: '0 0 24px', lineHeight: 1.6, fontFamily: 'var(--body)' }}>
+              {TAB_COPY[activeRole].fn}
+            </p>
+
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <label style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--dimmer)' }}>
+                  Valor de la declaración
+                </label>
+                <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: '1.5rem', color: ROLE_COLORS[activeRole] }}>
+                  {formatCOP(sliderVal)}
+                </div>
+              </div>
+              <input
+                type="range"
+                min={100000}
+                max={2000000}
+                step={50000}
+                value={sliderVal}
+                onChange={(e) => setSliderVal(Number(e.target.value))}
+                style={{ accentColor: ROLE_COLORS[activeRole] }}
+              />
+            </div>
+
+            {activeRole === 'contador' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24, background: 'rgba(0,0,0,0.4)', padding: 16, borderRadius: 14, border: '1px solid var(--line)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', fontSize: 14, color: cVend ? '#FFFFFF' : 'var(--dim)', fontFamily: 'var(--display)', fontWeight: 600 }}>
+                  <input
+                    type="checkbox"
+                    checked={cVend}
+                    onChange={(e) => setCVend(e.target.checked)}
+                    style={{ accentColor: ROLE_COLORS.vendedor, width: 18, height: 18 }}
+                  />
+                  También cerré la venta (+15%)
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', fontSize: 14, color: cRef ? '#FFFFFF' : 'var(--dim)', fontFamily: 'var(--display)', fontWeight: 600 }}>
+                  <input
+                    type="checkbox"
+                    checked={cRef}
+                    onChange={(e) => setCRef(e.target.checked)}
+                    style={{ accentColor: ROLE_COLORS.referido, width: 18, height: 18 }}
+                  />
+                  También traje al cliente (+5% referido)
+                </label>
+              </div>
+            )}
+
+            {/* Resultado Gran Número */}
+            <div
+              style={{
+                borderRadius: 18,
+                padding: '22px 26px',
+                background: `${ROLE_COLORS[activeRole]}15`,
+                border: `1px solid ${ROLE_COLORS[activeRole]}45`,
+                marginBottom: 18,
+                boxShadow: `0 0 30px ${ROLE_COLORS[activeRole]}15`,
+              }}
+            >
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: ROLE_COLORS[activeRole], opacity: 0.9, marginBottom: 6 }}>
+                Tu comisión
+              </div>
+              <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'clamp(2.2rem, 5.5vw, 3rem)', color: ROLE_COLORS[activeRole], letterSpacing: '-.03em' }}>
+                {formatCOP(currentComm.amt)}
+              </div>
+              <div style={{ fontSize: 14, color: 'var(--dim)', marginTop: 6 }}>
+                {currentComm.sub}
+              </div>
+            </div>
+
+            <p style={{ fontSize: 13, color: 'var(--dim)', margin: 0, lineHeight: 1.5 }}>
+              {TAB_COPY[activeRole].note}
+            </p>
+          </div>
+        </section>
+
+        {/* ── CALCULADORA DE MÁRGENES / TRANSPARENCIA ─── */}
+        <section style={{ maxWidth: 900, margin: '0 auto', padding: 'clamp(45px,6vw,65px) var(--pad)', borderTop: '1px solid var(--line-soft)' }}>
+          <div ref={(el) => reveal(el as any, 0)} className="fade" style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '.22em', textTransform: 'uppercase', color: '#4C87FF', marginBottom: 8, fontWeight: 600 }}>
+            Transparencia
+          </div>
+          <h2 ref={(el) => reveal(el as any, 1)} className="fade" style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'clamp(1.6rem,4.5vw,2.4rem)', letterSpacing: '-.04em', margin: '0 0 16px' }}>
+            ¿A dónde va cada peso?
+          </h2>
+          <p ref={(el) => reveal(el as any, 2)} className="fade lead" style={{ fontSize: 15, color: 'var(--dim)', maxWidth: '64ch', lineHeight: 1.6, marginBottom: 32 }}>
+            Este es el reparto completo del valor de una declaración entre todos los que la hacen posible. Cuando alguno del referido o vendedor no participa, su porcentaje se suma al contador.
           </p>
-        </div>
-      </section>
 
-      {/* ── CALCULADORA DE MÁRGENES / TRANSPARENCIA ─── */}
-      <section style={{ maxWidth: 840, margin: '0 auto', padding: 'clamp(40px,6vw,60px) clamp(20px,5vw,40px)', borderTop: `1px solid ${border}` }}>
-        <div ref={(el) => reveal(el as any, 0)} className="col-reveal" style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '.2em', textTransform: 'uppercase', color: '#38BDF8', marginBottom: 8, fontWeight: 700 }}>
-          Transparencia
-        </div>
-        <h2 ref={(el) => reveal(el as any, 1)} className="col-reveal" style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'clamp(1.5rem,4vw,2.2rem)', letterSpacing: '-.03em', margin: '0 0 14px' }}>
-          ¿A dónde va cada peso?
-        </h2>
-        <p ref={(el) => reveal(el as any, 2)} className="col-reveal" style={{ fontSize: 15, color: sub, maxWidth: '65ch', lineHeight: 1.6, marginBottom: 28 }}>
-          Este es el reparto completo del valor de una declaración entre todos los que la hacen posible. Cuando alguno del referido o vendedor no participa, su porcentaje se suma al contador.
-        </p>
+          <div ref={(el) => reveal(el as any, 3)} className="fade">
+            <MargenesCalculator initialAmount={400000} />
+          </div>
 
-        <div ref={(el) => reveal(el as any, 3)} className="col-reveal">
-          <MargenesCalculator initialAmount={400000} />
-        </div>
-
-        <p style={{ fontSize: 13, color: sub, marginTop: 24, textAlign: 'center', lineHeight: 1.5 }}>
-          La consultoría de $100.000 se cobra aparte y no entra en este reparto.
-        </p>
-      </section>
+          <p style={{ fontSize: 13, color: 'var(--dim)', marginTop: 26, textAlign: 'center', lineHeight: 1.5 }}>
+            La consultoría de $100.000 se cobra aparte y no entra en este reparto.
+          </p>
+        </section>
+      </main>
 
       {/* ── FOOTER ─── */}
       <footer
         style={{
-          borderTop: `1px solid ${border}`,
-          padding: 'clamp(35px, 5vw, 55px) 20px',
+          position: 'relative',
+          zIndex: 2,
+          borderTop: '1px solid var(--line-soft)',
+          padding: 'clamp(40px, 6vw, 60px) var(--pad)',
           textAlign: 'center',
-          color: sub,
+          color: 'var(--dimmer)',
           fontSize: 12,
           fontFamily: 'var(--mono)',
-          letterSpacing: '.12em',
+          letterSpacing: '.14em',
         }}
       >
         STAKEHOLDERS · Temporada de renta 2026

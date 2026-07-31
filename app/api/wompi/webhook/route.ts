@@ -2,6 +2,15 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { verifyEventChecksum } from '@/lib/wompi';
 
+export async function GET() {
+  return NextResponse.json({
+    ok: true,
+    status: 'active',
+    endpoint: '/api/wompi/webhook',
+    message: 'El endpoint de Webhook para eventos de Wompi está activo y escuchando peticiones POST de Wompi.',
+  });
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
