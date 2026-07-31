@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import CalculadoraComisiones from '@/components/stakeholders/CalculadoraComisiones';
 import '@/app/stakeholders.css';
 
 /* ── Interfaces ─────────────────────────────────────────────────────── */
@@ -11,6 +12,7 @@ interface UserSession {
   nombre: string;
   email: string;
   rol: 'desarrollador' | 'contador' | 'admin' | 'vendedor' | 'referido';
+  referral_slug?: string;
 }
 
 interface UsuarioData {
@@ -20,6 +22,7 @@ interface UsuarioData {
   rol: 'desarrollador' | 'contador' | 'admin' | 'vendedor' | 'referido';
   activo: boolean;
   created_at: string;
+  referral_slug?: string;
 }
 
 interface LeadData {
@@ -42,19 +45,55 @@ interface LeadData {
   estado: 'nuevo' | 'contactado' | 'agendado' | 'perdido';
   pagado?: boolean;
   etapa?: 'consultoria' | 'documentos' | 'anticipo' | 'declaracion' | 'entrega';
+  valor_declaracion?: number;
+  source?: string;
   created_at: string;
   contador_id?: string;
+  referrer_id?: string;
+  seller_id?: string;
   arquetipos?: { nombre: string; slug: string };
-  usuarios?: { id: string; nombre: string; email: string };
+  contador?: { id: string; nombre: string; email: string };
+  referido?: { id: string; nombre: string; email: string; referral_slug?: string };
+  vendedor?: { id: string; nombre: string; email: string };
   respuestas?: Array<{ payload: Record<string, any>; version_motor: string; created_at: string }>;
   ventas?: Array<{ id: string; medio_contacto?: string; fecha_consulta?: string; estado?: string }>;
+}
+
+interface VentasReporte {
+  resumen: {
+    totalVentasBrutas: number;
+    totalCostosComisiones: number;
+    totalUtilidadPlataforma: number;
+    totalComisionesContadores: number;
+    totalComisionesVendedores: number;
+    totalComisionesReferidos: number;
+    totalDesarrollo: number;
+    totalVentasConfirmadas: number;
+  };
+  ventas: Array<{
+    id: string;
+    nombre: string;
+    cedula: string;
+    source: string;
+    valorDeclaracion: number;
+    valorConsultoria: number;
+    totalVentaCliente: number;
+    contadorNombre: string;
+    referidoNombre: string;
+    vendedorNombre: string;
+    amtContador: number;
+    amtReferido: number;
+    amtVendedor: number;
+    amtDesarrollo: number;
+    amtPlataforma: number;
+  }>;
 }
 
 /* Format COP Currency */
 const formatCOP = (val: number) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val || 0);
 
-/* ── Clean SVG Trash Can Icon ────────────────────────────────────────── */
+/* Trash Icon */
 const TrashIcon = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
     <polyline points="3 6 5 6 21 6" />
@@ -62,23 +101,23 @@ const TrashIcon = () => (
   </svg>
 );
 
-/* ── Main Component ──────────────────────────────────────────────────── */
 export default function AdminDashboardPage() {
   const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   /* Auth & Tabs */
   const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
-  const [activeTab, setActiveTab] = useState<'crm' | 'leads' | 'usuarios'>('crm');
+  const [activeTab, setActiveTab] = useState<'crm' | 'leads' | 'usuarios' | 'ventas' | 'links' | 'calculadora' | 'comisiones'>('crm');
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
-  /* Global Loading Indicator (Punto 12) */
+  /* Global Loading Indicator */
   const [globalLoading, setGlobalLoading] = useState<boolean>(true);
   const [loadingText, setLoadingText] = useState<string>('Cargando sistema...');
 
   /* Data States */
   const [leads, setLeads] = useState<LeadData[]>([]);
   const [usuarios, setUsuarios] = useState<UsuarioData[]>([]);
+  const [reporteVentas, setReporteVentas] = useState<VentasReporte | null>(null);
 
   /* Filters */
   const [filterArquetipo, setFilterArquetipo] = useState('todos');
@@ -88,6 +127,7 @@ export default function AdminDashboardPage() {
   const [selectedRespuestasLead, setSelectedRespuestasLead] = useState<LeadData | null>(null);
   const [editingLead, setEditingLead] = useState<LeadData | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [copiedLinkText, setCopiedLinkText] = useState<string | null>(null);
 
   /* Form Edit Lead state */
   const [editNombre, setEditNombre] = useState('');
@@ -98,6 +138,7 @@ export default function AdminDashboardPage() {
   const [editEstado, setEditEstado] = useState<'nuevo' | 'contactado' | 'agendado' | 'perdido'>('nuevo');
   const [editPagado, setEditPagado] = useState(false);
   const [editEtapa, setEditEtapa] = useState<'consultoria' | 'documentos' | 'anticipo' | 'declaracion' | 'entrega'>('consultoria');
+  const [editValorDeclaracion, setEditValorDeclaracion] = useState(400000);
 
   /* Form Nuevo Usuario */
   const [newUserNombre, setNewUserNombre] = useState('');
@@ -105,6 +146,13 @@ export default function AdminDashboardPage() {
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserRol, setNewUserRol] = useState<'admin' | 'contador' | 'vendedor' | 'referido'>('contador');
   const [userMsg, setUserMsg] = useState<{ text: string; error?: boolean } | null>(null);
+
+  /* Roles Helper Flags */
+  const role = currentUser?.rol || 'admin';
+  const isDevOrAdmin = role === 'desarrollador' || role === 'admin';
+  const isContador = role === 'contador';
+  const isVendedor = role === 'vendedor';
+  const isReferido = role === 'referido';
 
   /* Theme Tokens */
   const isDark = theme === 'dark';
@@ -123,6 +171,22 @@ export default function AdminDashboardPage() {
     inputColor: isDark ? '#FFFFFF' : '#0F172A',
     modalBg: isDark ? '#101014' : '#FFFFFF',
   };
+
+  /* Check User session on load */
+  useEffect(() => {
+    const raw = localStorage.getItem('stakeholders_user');
+    if (raw) {
+      try {
+        const parsed: UserSession = JSON.parse(raw);
+        setCurrentUser(parsed);
+      } catch {
+        localStorage.removeItem('stakeholders_user');
+        router.replace('/admin/login');
+      }
+    } else {
+      router.replace('/admin/login');
+    }
+  }, []);
 
   /* Star Canvas background */
   useEffect(() => {
@@ -148,7 +212,7 @@ export default function AdminDashboardPage() {
     };
     const draw = () => {
       ctx.clearRect(0, 0, w, h);
-      if (!isDark) return; // Only draw stars in dark theme
+      if (!isDark) return;
       const time = performance.now() / 2600;
       for (const st of stars) {
         ctx.globalAlpha = st.a * (REDUCE ? 1 : 0.7 + 0.3 * Math.sin(time + st.t));
@@ -164,34 +228,6 @@ export default function AdminDashboardPage() {
     return () => { if (raf) cancelAnimationFrame(raf); window.removeEventListener('resize', onR); };
   }, [isDark]);
 
-  /* Check User session on load */
-  useEffect(() => {
-    const raw = localStorage.getItem('stakeholders_user');
-    if (raw) {
-      try {
-        const parsed: UserSession = JSON.parse(raw);
-        setCurrentUser(parsed);
-        if (parsed.rol === 'contador') {
-          setActiveTab('crm');
-        }
-      } catch {
-        // Sesión corrupta → limpiar y redirigir al login
-        localStorage.removeItem('stakeholders_user');
-        router.replace('/admin/login');
-      }
-    } else {
-      // Sin sesión → ir al login sin dejar el dashboard en el historial
-      router.replace('/admin/login');
-    }
-  }, []);
-
-  /* Body background theme */
-  useEffect(() => {
-    const prev = document.body.style.backgroundColor;
-    document.body.style.backgroundColor = t.bg;
-    return () => { document.body.style.backgroundColor = prev; };
-  }, [t.bg]);
-
   /* Fetch Data */
   const loadData = async (msg = 'Cargando datos...') => {
     setLoadingText(msg);
@@ -201,185 +237,119 @@ export default function AdminDashboardPage() {
         fetch('/api/admin/leads'),
         fetch('/api/admin/usuarios'),
       ]);
+
       const dataLeads = await resLeads.json();
       const dataUsuarios = await resUsuarios.json();
 
       if (dataLeads.leads) setLeads(dataLeads.leads);
-      if (dataUsuarios.usuarios) {
-        setUsuarios(dataUsuarios.usuarios);
-        const raw = localStorage.getItem('stakeholders_user');
-        const sessionEmail = raw ? JSON.parse(raw).email : 'admin@stakeholders.co';
-        const dbUser = dataUsuarios.usuarios.find((u: UsuarioData) => u.email.toLowerCase() === sessionEmail.toLowerCase());
-        if (dbUser) {
-          const updated: UserSession = { id: dbUser.id, nombre: dbUser.nombre, email: dbUser.email, rol: dbUser.rol };
-          setCurrentUser(updated);
-          localStorage.setItem('stakeholders_user', JSON.stringify(updated));
+      if (dataUsuarios.usuarios) setUsuarios(dataUsuarios.usuarios);
+
+      if (isDevOrAdmin) {
+        const resVentas = await fetch('/api/admin/ventas');
+        const dataVentas = await resVentas.json();
+        if (!dataVentas.error) {
+          setReporteVentas(dataVentas);
         }
       }
-    } catch (err) {
-      console.error('Error cargando panel admin:', err);
+    } catch (error) {
+      console.error('Error cargando información:', error);
     } finally {
       setGlobalLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData('Iniciando panel de control...');
-  }, []);
+    if (currentUser) loadData();
+  }, [currentUser]);
 
-  /* Handlers */
-  const handleUpdateEstadoLead = async (leadId: string, nuevoEstado: string) => {
-    setLoadingText('Guardando estado...');
+  /* Actions */
+  const handleLogout = () => {
+    localStorage.removeItem('stakeholders_user');
+    router.push('/admin/login');
+  };
+
+  const handleUpdateAssignment = async (leadId: string, field: 'contador_id' | 'referrer_id' | 'seller_id' | 'source', value: string | null) => {
+    setLoadingText('Actualizando asignación...');
     setGlobalLoading(true);
     try {
-      await fetch('/api/admin/leads', {
+      const res = await fetch('/api/admin/leads', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: leadId, estado: nuevoEstado }),
+        body: JSON.stringify({ id: leadId, [field]: value }),
       });
-      await loadData('Actualizando lista...');
-    } catch (e) {
-      console.error(e);
+      if (res.ok) {
+        await loadData('Asignación guardada');
+      }
+    } catch (err) {
+      console.error('Error asignando:', err);
       setGlobalLoading(false);
     }
   };
 
-  const handleUpdatePagadoLead = async (leadId: string, nuevoPagado: boolean) => {
+  const handleUpdateEtapaLead = async (leadId: string, etapa: string) => {
+    setLoadingText('Actualizando etapa...');
+    setGlobalLoading(true);
+    try {
+      const res = await fetch('/api/admin/leads', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: leadId, etapa }),
+      });
+      if (res.ok) {
+        await loadData('Etapa actualizada');
+      }
+    } catch (err) {
+      console.error('Error actualizando etapa:', err);
+      setGlobalLoading(false);
+    }
+  };
+
+  const handleUpdatePagadoLead = async (leadId: string, pagado: boolean) => {
     setLoadingText('Actualizando estado de pago...');
     setGlobalLoading(true);
     try {
-      await fetch('/api/admin/leads', {
+      const res = await fetch('/api/admin/leads', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: leadId, pagado: nuevoPagado }),
+        body: JSON.stringify({ id: leadId, pagado }),
       });
-      await loadData('Estado de pago actualizado');
-    } catch (e) {
-      console.error(e);
+      if (res.ok) {
+        await loadData('Estado de pago actualizado');
+      }
+    } catch (err) {
+      console.error('Error actualizando pago:', err);
       setGlobalLoading(false);
     }
   };
 
-  const handleUpdateEtapaLead = async (leadId: string, nuevaEtapa: string) => {
-    setLoadingText('Actualizando etapa de embudo...');
-    setGlobalLoading(true);
-    try {
-      await fetch('/api/admin/leads', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: leadId, etapa: nuevaEtapa }),
-      });
-      await loadData('Etapa de embudo actualizada');
-    } catch (e) {
-      console.error(e);
-      setGlobalLoading(false);
-    }
-  };
-
-  const handleAssignContador = async (leadId: string, contadorId: string | null) => {
-    setLoadingText('Asignando lead...');
-    setGlobalLoading(true);
-    try {
-      await fetch('/api/admin/leads', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: leadId, contador_id: contadorId }),
-      });
-      await loadData('Lead asignado con éxito');
-    } catch (e) {
-      console.error(e);
-      setGlobalLoading(false);
-    }
-  };
-
-  /* Remove lead from CRM (unassign) */
   const handleRemoveFromCRM = async (leadId: string) => {
-    if (!confirm('¿Deseas quitar este lead de tu CRM? (Seguirá existiendo en la base de datos principal)')) return;
-    setLoadingText('Eliminando del CRM...');
+    if (!confirm('¿Seguro que deseas eliminar este cliente del CRM?')) return;
+    setLoadingText('Eliminando cliente...');
     setGlobalLoading(true);
     try {
-      await fetch('/api/admin/leads', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: leadId, contador_id: null }),
-      });
-      await loadData('Lead removido del CRM');
-    } catch (e) {
-      console.error(e);
-      setGlobalLoading(false);
-    }
-  };
-
-  /* Delete lead completely from system */
-  const handleDeleteLeadCompletely = async (leadId: string) => {
-    if (!confirm('⚠️ ¿ESTÁS SEGURO? Esta acción eliminará el lead por completo de LEADS y de CRM.')) return;
-    setLoadingText('Eliminando lead por completo...');
-    setGlobalLoading(true);
-    try {
-      await fetch('/api/admin/leads', {
+      const res = await fetch('/api/admin/leads', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: leadId }),
       });
-      await loadData('Lead eliminado del sistema');
-    } catch (e) {
-      console.error(e);
-      setGlobalLoading(false);
-    }
-  };
-
-  /* Edit Lead Modal open handler */
-  const handleOpenEditLead = (lead: LeadData) => {
-    setEditingLead(lead);
-    setEditNombre(lead.nombre || '');
-    setEditCedula(lead.cedula || '');
-    setEditEdad(lead.edad || 28);
-    setEditCelular(lead.celular || '');
-    setEditCorreo(lead.correo || '');
-    setEditEstado(lead.estado || 'nuevo');
-    setEditPagado(Boolean(lead.pagado));
-    setEditEtapa(lead.etapa || 'consultoria');
-  };
-
-  /* Save Edit Lead handler */
-  const handleSaveEditLead = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingLead) return;
-    setLoadingText('Guardando cambios del lead...');
-    setGlobalLoading(true);
-    try {
-      await fetch('/api/admin/leads', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: editingLead.id,
-          nombre: editNombre,
-          cedula: editCedula,
-          edad: editEdad,
-          celular: editCelular,
-          correo: editCorreo,
-          estado: editEstado,
-          pagado: editPagado,
-          etapa: editEtapa,
-        }),
-      });
-      setEditingLead(null);
-      await loadData('Lead actualizado con éxito');
-    } catch (e) {
-      console.error(e);
+      if (res.ok) {
+        await loadData('Cliente eliminado');
+      }
+    } catch (err) {
+      console.error('Error eliminando lead:', err);
       setGlobalLoading(false);
     }
   };
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    setUserMsg(null);
     if (!newUserNombre || !newUserEmail || !newUserPassword) {
-      setUserMsg({ text: 'Todos los campos son obligatorios', error: true });
+      setUserMsg({ text: 'Completa todos los campos obligatorios', error: true });
       return;
     }
-    setLoadingText('Creando usuario...');
+    setLoadingText('Creando nuevo usuario...');
     setGlobalLoading(true);
-    setUserMsg(null);
     try {
       const res = await fetch('/api/admin/usuarios', {
         method: 'POST',
@@ -392,120 +362,171 @@ export default function AdminDashboardPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error creando usuario');
-
-      setNewUserNombre('');
-      setNewUserEmail('');
-      setNewUserPassword('');
-      setUserMsg({ text: 'Usuario creado exitosamente ✓' });
-      await loadData('Actualizando usuarios...');
-    } catch (err: unknown) {
-      setUserMsg({ text: err instanceof Error ? err.message : 'Error inesperado', error: true });
+      if (!res.ok) {
+        setUserMsg({ text: data.error || 'Error al crear usuario', error: true });
+      } else {
+        setUserMsg({ text: '✅ Usuario creado con éxito' });
+        setNewUserNombre('');
+        setNewUserEmail('');
+        setNewUserPassword('');
+        await loadData('Usuario agregado');
+      }
+    } catch (err) {
+      console.error('Error creando usuario:', err);
+      setUserMsg({ text: 'Error de conexión', error: true });
+    } finally {
       setGlobalLoading(false);
     }
   };
 
-  const handleToggleUserActivo = async (user: UsuarioData) => {
-    setLoadingText('Actualizando estado...');
+  const handleOpenEditLead = (lead: LeadData) => {
+    setEditingLead(lead);
+    setEditNombre(lead.nombre);
+    setEditCedula(lead.cedula);
+    setEditEdad(lead.edad);
+    setEditCelular(lead.celular || '');
+    setEditCorreo(lead.correo || '');
+    setEditEstado(lead.estado);
+    setEditPagado(Boolean(lead.pagado));
+    setEditEtapa(lead.etapa || 'consultoria');
+    setEditValorDeclaracion(lead.valor_declaracion || 400000);
+  };
+
+  const handleSaveEditLead = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingLead) return;
+    setLoadingText('Guardando cambios...');
     setGlobalLoading(true);
     try {
-      await fetch('/api/admin/usuarios', {
+      const res = await fetch('/api/admin/leads', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: user.id, activo: !user.activo }),
+        body: JSON.stringify({
+          id: editingLead.id,
+          nombre: editNombre,
+          cedula: editCedula,
+          edad: editEdad,
+          celular: editCelular,
+          correo: editCorreo,
+          estado: editEstado,
+          pagado: editPagado,
+          etapa: editEtapa,
+          valor_declaracion: editValorDeclaracion,
+        }),
       });
-      await loadData('Estado de usuario actualizado');
-    } catch (e) {
-      console.error(e);
+      if (res.ok) {
+        setEditingLead(null);
+        await loadData('Cambios guardados');
+      }
+    } catch (err) {
+      console.error('Error editando lead:', err);
       setGlobalLoading(false);
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('stakeholders_user');
-    // Usar replace para eliminar el dashboard del historial (evita que el botón Atrás lo muestre)
-    router.replace('/');
-  };
+  /* Filter Logic based on user role */
+  const crmLeads = leads.filter((lead) => {
+    if (!lead.pagado) return false;
+    if (isDevOrAdmin) return true;
+    if (isContador) return lead.contador_id === currentUser?.id;
+    if (isVendedor) return lead.seller_id === currentUser?.id || lead.referrer_id === currentUser?.id;
+    if (isReferido) return lead.referrer_id === currentUser?.id;
+    return false;
+  });
 
-  /* Filter Logic */
-  const isDev = currentUser?.rol === 'desarrollador' || currentUser?.rol === 'admin';
-
-  const crmLeads = leads.filter((l) => {
-    // El CRM muestra únicamente los clientes que YA PAGARON
-    if (!l.pagado) return false;
-    if (!isDev) {
-      return l.contador_id === currentUser?.id;
-    }
+  const finalCrmLeads = crmLeads.filter((lead) => {
+    if (filterArquetipo !== 'todos' && lead.arquetipos?.slug !== filterArquetipo) return false;
+    if (filterEstado !== 'todos' && lead.estado !== filterEstado) return false;
     return true;
   });
 
-  const filterLeads = (list: LeadData[]) => {
-    return list.filter((l) => {
-      if (filterArquetipo !== 'todos' && l.arquetipos?.slug !== filterArquetipo) return false;
-      if (filterEstado !== 'todos' && l.estado !== filterEstado) return false;
-      return true;
-    });
+  const finalAllLeads = leads.filter((lead) => {
+    if (filterArquetipo !== 'todos' && lead.arquetipos?.slug !== filterArquetipo) return false;
+    if (filterEstado !== 'todos' && lead.estado !== filterEstado) return false;
+    return true;
+  });
+
+  /* Calculate user referral links */
+  const userSlug = currentUser?.referral_slug || currentUser?.nombre?.toLowerCase().replace(/[^a-z0-9]/g, '') || currentUser?.id.substring(0, 6);
+  const testLink = typeof window !== 'undefined' ? `${window.location.origin}/test?ref=${userSlug}` : `https://rentash.vercel.app/test?ref=${userSlug}`;
+  const agendarLink = typeof window !== 'undefined' ? `${window.location.origin}/agendar?ref=${userSlug}` : `https://rentash.vercel.app/agendar?ref=${userSlug}`;
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedLinkText(label);
+    setTimeout(() => setCopiedLinkText(null), 3000);
   };
 
-  const finalCrmLeads = filterLeads(crmLeads);
-  const finalAllLeads = filterLeads(leads);
+  const renderEtapaBadge = (etapa?: string) => {
+    const map: Record<string, string> = {
+      consultoria: '01. Consultoría ($100k)',
+      documentos: '02. Documentos',
+      anticipo: '03. Anticipo (50%)',
+      declaracion: '04. Declaración',
+      entrega: '05. Entrega Final',
+    };
+    return (
+      <span style={{
+        padding: '4px 10px', borderRadius: 8, background: 'rgba(78,214,161,0.15)',
+        border: '1px solid rgba(78,214,161,0.3)', color: isDark ? '#4ED6A1' : '#16A34A',
+        fontSize: 11, fontFamily: 'var(--mono)', fontWeight: 600,
+      }}>
+        {map[etapa || 'consultoria'] || '01. Consultoría ($100k)'}
+      </span>
+    );
+  };
 
-  /* Clean Medio de Contacto badges */
   const renderMedioContacto = (lead: LeadData) => {
-    const medio = lead.ventas?.[0]?.medio_contacto || 'llamada';
-    if (medio === 'videollamada') return <span style={{ color: isDark ? '#7DD3FC' : '#0284C7', fontSize: 11, fontFamily: 'var(--mono)' }}>Videollamada</span>;
-    if (medio === 'whatsapp') return <span style={{ color: isDark ? '#4ED6A1' : '#16A34A', fontSize: 11, fontFamily: 'var(--mono)' }}>WhatsApp</span>;
-    return <span style={{ color: isDark ? '#F0B93C' : '#D97706', fontSize: 11, fontFamily: 'var(--mono)' }}>Llamada</span>;
+    const medio = lead.ventas?.[0]?.medio_contacto;
+    if (!medio) return <span style={{ fontSize: 11, color: t.subtext }}>Sin especificar</span>;
+    if (medio === 'videollamada') return <span style={{ fontSize: 11, color: '#7DD3FC', fontWeight: 600 }}>📹 Videollamada</span>;
+    if (medio === 'whatsapp') return <span style={{ fontSize: 11, color: '#4ED6A1', fontWeight: 600 }}>💬 WhatsApp</span>;
+    return <span style={{ fontSize: 11, color: '#FBBF24', fontWeight: 600 }}>📞 Llamada</span>;
   };
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: t.bg, color: t.text, position: 'relative', display: 'flex', fontFamily: 'var(--body)', transition: 'background-color .3s, color .3s' }}>
-      {/* Stars Canvas */}
-      <canvas ref={canvasRef} id="stars" aria-hidden="true" style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', display: isDark ? 'block' : 'none' }} />
-      {isDark && <div className="veil" aria-hidden="true" style={{ position: 'fixed', inset: 0, zIndex: 1, pointerEvents: 'none' }} />}
+    <div style={{ minHeight: '100vh', backgroundColor: t.bg, color: t.text, position: 'relative', overflowX: 'hidden' }}>
+      <canvas ref={canvasRef} style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0 }} />
 
-      {/* ── GLOBAL LOADING SPINNER OVERLAY ── */}
+      {/* ── Global Loading Indicator (Punto 12) ── */}
       {globalLoading && (
         <div style={{
-          position: 'fixed', top: 20, right: 20, zIndex: 999,
-          background: isDark ? 'rgba(10,10,14,0.90)' : 'rgba(255,255,255,0.95)', backdropFilter: 'blur(16px)',
-          border: '1px solid rgba(61,107,255,0.4)', borderRadius: 999,
-          padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 10,
-          boxShadow: '0 0 30px rgba(61,107,255,0.25)',
-          animation: 'popIn .3s cubic-bezier(.34,1.42,.5,1) both',
+          position: 'fixed', top: 0, left: 0, right: 0, height: 4, zIndex: 9999,
+          background: 'linear-gradient(90deg, #3D6BFF, #4ED6A1, #7DD3FC)',
+          backgroundSize: '200% 100%', animation: 'loadingBar 1.5s infinite linear',
         }}>
-          <div style={{
-            width: 16, height: 16, border: '2px solid rgba(61,107,255,0.3)',
-            borderTopColor: '#3D6BFF', borderRadius: '50%',
-            animation: 'spinLoading .75s linear infinite',
-          }} />
-          <span style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '.1em', color: t.text }}>
-            {loadingText}
-          </span>
+          <style>{`
+            @keyframes loadingBar {
+              0% { background-position: 0% 0%; }
+              100% { background-position: 200% 0%; }
+            }
+          `}</style>
         </div>
       )}
 
-      {/* ── SIDEBAR PANEL ── */}
-      <aside style={{
-        width: 220, background: t.sidebarBg, backdropFilter: 'blur(20px)',
-        borderRight: `1px solid ${t.border}`, zIndex: 50,
-        display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-        position: 'fixed', top: 0, bottom: 0, left: 0,
-        transition: 'transform .3s var(--ease), background-color .3s',
-      }} className={`admin-sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+      {/* ── SIDEBAR NAV ── */}
+      <aside
+        style={{
+          width: 220, position: 'fixed', top: 0, bottom: 0, left: 0, zIndex: 50,
+          background: t.sidebarBg, backdropFilter: 'blur(20px)',
+          borderRight: `1px solid ${t.border}`, display: 'flex', flexDirection: 'column',
+          justifyContent: 'space-between', transition: 'transform 0.3s ease',
+        }}
+        className={`admin-sidebar ${mobileMenuOpen ? 'open' : ''}`}
+      >
         <div>
-          {/* Header Brand */}
+          {/* Brand */}
           <div style={{ padding: '24px 20px', borderBottom: `1px solid ${t.border}` }}>
-            <Link href="/" style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 18, color: t.text, letterSpacing: '-.03em' }}>
+            <Link href="/" style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 16, color: t.text, textDecoration: 'none', letterSpacing: '-.03em' }}>
               STAKEHOLDERS<span style={{ color: '#3D6BFF' }}>.</span>
             </Link>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
               <span style={{
                 fontFamily: 'var(--mono)', fontSize: 9, letterSpacing: '.16em', textTransform: 'uppercase',
                 padding: '3px 8px', borderRadius: 999,
-                background: isDev ? 'rgba(61,107,255,0.15)' : 'rgba(78,214,161,0.15)',
-                color: isDev ? (isDark ? '#7DD3FC' : '#0284C7') : (isDark ? '#4ED6A1' : '#16A34A'),
-                border: `1px solid ${isDev ? 'rgba(61,107,255,0.4)' : 'rgba(78,214,161,0.4)'}`,
+                background: isDevOrAdmin ? 'rgba(61,107,255,0.15)' : 'rgba(78,214,161,0.15)',
+                color: isDevOrAdmin ? (isDark ? '#7DD3FC' : '#0284C7') : (isDark ? '#4ED6A1' : '#16A34A'),
+                border: `1px solid ${isDevOrAdmin ? 'rgba(61,107,255,0.4)' : 'rgba(78,214,161,0.4)'}`,
               }}>
                 {currentUser?.rol || 'Admin'}
               </span>
@@ -522,7 +543,7 @@ export default function AdminDashboardPage() {
               onClick={() => { setActiveTab('crm'); setMobileMenuOpen(false); }}
               style={{
                 width: '100%', padding: '12px 14px', borderRadius: 12, textAlign: 'left',
-                fontFamily: 'var(--mono)', fontSize: 12, letterSpacing: '.16em', textTransform: 'uppercase',
+                fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', transition: 'all .2s',
                 background: activeTab === 'crm' ? 'rgba(61,107,255,0.18)' : 'transparent',
                 border: activeTab === 'crm' ? '1px solid rgba(61,107,255,0.5)' : '1px solid transparent',
@@ -535,13 +556,62 @@ export default function AdminDashboardPage() {
               </span>
             </button>
 
-            {/* 2. USUARIOS */}
-            {isDev && (
+            {/* 2. REPORTE DE VENTAS & FINANZAS (Solo Admins) */}
+            {isDevOrAdmin && (
+              <button
+                onClick={() => { setActiveTab('ventas'); setMobileMenuOpen(false); }}
+                style={{
+                  width: '100%', padding: '12px 14px', borderRadius: 12, textAlign: 'left',
+                  fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', transition: 'all .2s',
+                  background: activeTab === 'ventas' ? 'rgba(61,107,255,0.18)' : 'transparent',
+                  border: activeTab === 'ventas' ? '1px solid rgba(61,107,255,0.5)' : '1px solid transparent',
+                  color: activeTab === 'ventas' ? t.text : t.subtext,
+                }}
+              >
+                VENTAS &amp; FINANZAS
+              </button>
+            )}
+
+            {/* 3. MIS LINKS DE REFERIDO (Para Referidos, Vendedores y Admins) */}
+            {(isReferido || isVendedor || isDevOrAdmin) && (
+              <button
+                onClick={() => { setActiveTab('links'); setMobileMenuOpen(false); }}
+                style={{
+                  width: '100%', padding: '12px 14px', borderRadius: 12, textAlign: 'left',
+                  fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', transition: 'all .2s',
+                  background: activeTab === 'links' ? 'rgba(61,107,255,0.18)' : 'transparent',
+                  border: activeTab === 'links' ? '1px solid rgba(61,107,255,0.5)' : '1px solid transparent',
+                  color: activeTab === 'links' ? t.text : t.subtext,
+                }}
+              >
+                LINKS DE REFERIDO 🔗
+              </button>
+            )}
+
+            {/* 4. CALCULADORA DE COMISIONES (Para Todos) */}
+            <button
+              onClick={() => { setActiveTab('calculadora'); setMobileMenuOpen(false); }}
+              style={{
+                width: '100%', padding: '12px 14px', borderRadius: 12, textAlign: 'left',
+                fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', transition: 'all .2s',
+                background: activeTab === 'calculadora' ? 'rgba(61,107,255,0.18)' : 'transparent',
+                border: activeTab === 'calculadora' ? '1px solid rgba(61,107,255,0.5)' : '1px solid transparent',
+                color: activeTab === 'calculadora' ? t.text : t.subtext,
+              }}
+            >
+              CALCULADORA 🧮
+            </button>
+
+            {/* 5. USUARIOS (Solo Admin) */}
+            {isDevOrAdmin && (
               <button
                 onClick={() => { setActiveTab('usuarios'); setMobileMenuOpen(false); }}
                 style={{
                   width: '100%', padding: '12px 14px', borderRadius: 12, textAlign: 'left',
-                  fontFamily: 'var(--mono)', fontSize: 12, letterSpacing: '.16em', textTransform: 'uppercase',
+                  fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', transition: 'all .2s',
                   background: activeTab === 'usuarios' ? 'rgba(61,107,255,0.18)' : 'transparent',
                   border: activeTab === 'usuarios' ? '1px solid rgba(61,107,255,0.5)' : '1px solid transparent',
@@ -555,13 +625,13 @@ export default function AdminDashboardPage() {
               </button>
             )}
 
-            {/* 3. LEADS (ÚLTIMO TAB) */}
-            {isDev && (
+            {/* 6. LEADS (ÚLTIMO TAB — Solo Admin) */}
+            {isDevOrAdmin && (
               <button
                 onClick={() => { setActiveTab('leads'); setMobileMenuOpen(false); }}
                 style={{
                   width: '100%', padding: '12px 14px', borderRadius: 12, textAlign: 'left',
-                  fontFamily: 'var(--mono)', fontSize: 12, letterSpacing: '.16em', textTransform: 'uppercase',
+                  fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', transition: 'all .2s',
                   background: activeTab === 'leads' ? 'rgba(61,107,255,0.18)' : 'transparent',
                   border: activeTab === 'leads' ? '1px solid rgba(61,107,255,0.5)' : '1px solid transparent',
@@ -619,13 +689,15 @@ export default function AdminDashboardPage() {
             </span>
             <h1 style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'clamp(1.5rem,4vw,2.2rem)', margin: 0, letterSpacing: '-.04em', color: t.text }}>
               {activeTab === 'crm' && 'CRM — Clientes Pagados'}
+              {activeTab === 'ventas' && 'Reporte de Ventas & Finanzas'}
+              {activeTab === 'links' && 'Mis Links de Referidos'}
+              {activeTab === 'calculadora' && 'Calculadora de Comisiones'}
               {activeTab === 'leads' && 'Todos los Leads Registrados'}
               {activeTab === 'usuarios' && 'Usuarios y Permisos'}
             </h1>
           </div>
 
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            {/* Theme Switcher Button */}
             <button
               onClick={() => setTheme(isDark ? 'light' : 'dark')}
               style={{
@@ -679,7 +751,7 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* ── TAB 1: CRM (SOLO CLIENTES PAGADOS + PIPELINE INTEGRADO) ── */}
+        {/* ── TAB 1: CRM (SOLO CLIENTES PAGADOS) ── */}
         {activeTab === 'crm' && (
           <div style={{
             background: t.cardBg, backdropFilter: 'blur(20px)',
@@ -691,9 +763,10 @@ export default function AdminDashboardPage() {
                 <thead>
                   <tr style={{ background: t.tableHeaderBg, borderBottom: `1px solid ${t.border}`, fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: t.tableHeaderColor }}>
                     <th style={{ padding: '16px 18px' }}>Persona / Cédula</th>
-                    <th style={{ padding: '16px 18px' }}>Arquetipo & Finanzas</th>
-                    <th style={{ padding: '16px 18px' }}>Etapa Embudo (Pipeline)</th>
-                    <th style={{ padding: '16px 18px' }}>Contador Asignado</th>
+                    <th style={{ padding: '16px 18px' }}>Arquetipo &amp; Finanzas</th>
+                    <th style={{ padding: '16px 18px' }}>Etapa Embudo</th>
+                    {isDevOrAdmin && <th style={{ padding: '16px 18px' }}>Referido / Vendedor / Contador</th>}
+                    {!isDevOrAdmin && <th style={{ padding: '16px 18px' }}>Asignación</th>}
                     <th style={{ padding: '16px 18px' }}>Contacto</th>
                     <th style={{ padding: '16px 18px' }}>Vencimiento</th>
                     <th style={{ padding: '16px 18px', textAlign: 'right' }}>Acciones</th>
@@ -702,8 +775,8 @@ export default function AdminDashboardPage() {
                 <tbody>
                   {finalCrmLeads.length === 0 ? (
                     <tr>
-                      <td colSpan={7} style={{ padding: 40, textAlign: 'center', color: t.subtext, fontSize: 14 }}>
-                        No hay clientes pagados en el CRM en este momento.
+                      <td colSpan={8} style={{ padding: 40, textAlign: 'center', color: t.subtext, fontSize: 14 }}>
+                        No hay clientes pagados registrados en este momento.
                       </td>
                     </tr>
                   ) : (
@@ -717,7 +790,7 @@ export default function AdminDashboardPage() {
                           </span>
                         </td>
 
-                        {/* Arquetipo & Finanzas */}
+                        {/* Arquetipo */}
                         <td style={{ padding: '16px 18px' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                             <span style={{
@@ -734,42 +807,86 @@ export default function AdminDashboardPage() {
 
                         {/* Etapa Embudo (Pipeline) */}
                         <td style={{ padding: '16px 18px' }}>
-                          <select
-                            value={lead.etapa || 'consultoria'}
-                            onChange={(e) => handleUpdateEtapaLead(lead.id, e.target.value)}
-                            style={{
-                              background: 'rgba(14,124,102,0.15)',
-                              border: '1px solid rgba(14,124,102,0.4)',
-                              borderRadius: 8, color: isDark ? '#4ED6A1' : '#0E7C66', padding: '6px 10px', fontSize: 11, fontFamily: 'var(--mono)', fontWeight: 600, outline: 'none',
-                            }}
-                          >
-                            <option value="consultoria" style={{ background: t.modalBg, color: t.text }}>01. Consultoría ($100k)</option>
-                            <option value="documentos" style={{ background: t.modalBg, color: t.text }}>02. Documentos</option>
-                            <option value="anticipo" style={{ background: t.modalBg, color: t.text }}>03. Anticipo (50%)</option>
-                            <option value="declaracion" style={{ background: t.modalBg, color: t.text }}>04. Declaración</option>
-                            <option value="entrega" style={{ background: t.modalBg, color: t.text }}>05. Entrega Final</option>
-                          </select>
+                          {isDevOrAdmin || isContador ? (
+                            <select
+                              value={lead.etapa || 'consultoria'}
+                              onChange={(e) => handleUpdateEtapaLead(lead.id, e.target.value)}
+                              style={{
+                                background: 'rgba(14,124,102,0.15)',
+                                border: '1px solid rgba(14,124,102,0.4)',
+                                borderRadius: 8, color: isDark ? '#4ED6A1' : '#0E7C66', padding: '6px 10px', fontSize: 11, fontFamily: 'var(--mono)', fontWeight: 600, outline: 'none',
+                              }}
+                            >
+                              <option value="consultoria" style={{ background: t.modalBg, color: t.text }}>01. Consultoría ($100k)</option>
+                              <option value="documentos" style={{ background: t.modalBg, color: t.text }}>02. Documentos</option>
+                              <option value="anticipo" style={{ background: t.modalBg, color: t.text }}>03. Anticipo (50%)</option>
+                              <option value="declaracion" style={{ background: t.modalBg, color: t.text }}>04. Declaración</option>
+                              <option value="entrega" style={{ background: t.modalBg, color: t.text }}>05. Entrega Final</option>
+                            </select>
+                          ) : (
+                            renderEtapaBadge(lead.etapa)
+                          )}
                         </td>
 
-                        {/* Contador Asignado */}
-                        <td style={{ padding: '16px 18px' }}>
-                          <select
-                            value={lead.contador_id || ''}
-                            onChange={(e) => handleAssignContador(lead.id, e.target.value || null)}
-                            style={{
-                              background: lead.contador_id ? 'rgba(61,107,255,0.18)' : t.inputBg,
-                              border: lead.contador_id ? '1px solid rgba(61,107,255,0.5)' : `1px solid ${t.inputBorder}`,
-                              borderRadius: 8, color: t.inputColor, padding: '4px 8px', fontSize: 11, fontFamily: 'var(--body)', outline: 'none',
-                            }}
-                          >
-                            <option value="" style={{ background: t.modalBg, color: t.text }}>Sin asignar</option>
-                            {usuarios.map((u) => (
-                              <option key={u.id} value={u.id} style={{ background: t.modalBg, color: t.text }}>
-                                {u.nombre} ({u.rol})
-                              </option>
-                            ))}
-                          </select>
-                        </td>
+                        {/* Múltiple Asignación (Referido / Vendedor / Contador) */}
+                        {isDevOrAdmin ? (
+                          <td style={{ padding: '16px 18px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {/* Referido */}
+                              <select
+                                value={lead.referrer_id || ''}
+                                onChange={(e) => handleUpdateAssignment(lead.id, 'referrer_id', e.target.value || null)}
+                                style={{
+                                  background: lead.referrer_id ? 'rgba(78,214,161,0.12)' : t.inputBg,
+                                  border: `1px solid ${lead.referrer_id ? 'rgba(78,214,161,0.4)' : t.inputBorder}`,
+                                  borderRadius: 6, color: t.inputColor, padding: '3px 6px', fontSize: 10, fontFamily: 'var(--body)', outline: 'none',
+                                }}
+                              >
+                                <option value="" style={{ background: t.modalBg, color: t.text }}>Ref: Sin asignar</option>
+                                {usuarios.filter(u => u.rol === 'referido' || u.rol === 'vendedor' || u.rol === 'admin').map(u => (
+                                  <option key={u.id} value={u.id} style={{ background: t.modalBg, color: t.text }}>Ref: {u.nombre}</option>
+                                ))}
+                              </select>
+
+                              {/* Vendedor */}
+                              <select
+                                value={lead.seller_id || ''}
+                                onChange={(e) => handleUpdateAssignment(lead.id, 'seller_id', e.target.value || null)}
+                                style={{
+                                  background: lead.seller_id ? 'rgba(251,191,36,0.12)' : t.inputBg,
+                                  border: `1px solid ${lead.seller_id ? 'rgba(251,191,36,0.4)' : t.inputBorder}`,
+                                  borderRadius: 6, color: t.inputColor, padding: '3px 6px', fontSize: 10, fontFamily: 'var(--body)', outline: 'none',
+                                }}
+                              >
+                                <option value="" style={{ background: t.modalBg, color: t.text }}>Vend: Sin asignar</option>
+                                {usuarios.filter(u => u.rol === 'vendedor' || u.rol === 'admin').map(u => (
+                                  <option key={u.id} value={u.id} style={{ background: t.modalBg, color: t.text }}>Vend: {u.nombre}</option>
+                                ))}
+                              </select>
+
+                              {/* Contador */}
+                              <select
+                                value={lead.contador_id || ''}
+                                onChange={(e) => handleUpdateAssignment(lead.id, 'contador_id', e.target.value || null)}
+                                style={{
+                                  background: lead.contador_id ? 'rgba(61,107,255,0.15)' : t.inputBg,
+                                  border: `1px solid ${lead.contador_id ? 'rgba(61,107,255,0.4)' : t.inputBorder}`,
+                                  borderRadius: 6, color: t.inputColor, padding: '3px 6px', fontSize: 10, fontFamily: 'var(--body)', outline: 'none',
+                                }}
+                              >
+                                <option value="" style={{ background: t.modalBg, color: t.text }}>Cont: Sin asignar</option>
+                                {usuarios.filter(u => u.rol === 'contador' || u.rol === 'admin').map(u => (
+                                  <option key={u.id} value={u.id} style={{ background: t.modalBg, color: t.text }}>Cont: {u.nombre}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </td>
+                        ) : (
+                          <td style={{ padding: '16px 18px', fontSize: 11, color: t.subtext }}>
+                            <div>Contador: {lead.contador?.nombre || 'Sin asignar'}</div>
+                            {lead.vendedor?.nombre && <div>Vendedor: {lead.vendedor.nombre}</div>}
+                          </td>
+                        )}
 
                         {/* Contacto */}
                         <td style={{ padding: '16px 18px' }}>
@@ -801,40 +918,46 @@ export default function AdminDashboardPage() {
                               Resultado ↗
                             </Link>
 
-                            <button
-                              onClick={() => setSelectedRespuestasLead(lead)}
-                              style={{
-                                padding: '5px 10px', borderRadius: 8, background: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0',
-                                border: `1px solid ${t.inputBorder}`, color: t.text,
-                                fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer',
-                              }}
-                            >
-                              Finanzas
-                            </button>
+                            {(isDevOrAdmin || isContador) && (
+                              <button
+                                onClick={() => setSelectedRespuestasLead(lead)}
+                                style={{
+                                  padding: '5px 10px', borderRadius: 8, background: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0',
+                                  border: `1px solid ${t.inputBorder}`, color: t.text,
+                                  fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer',
+                                }}
+                              >
+                                Finanzas
+                              </button>
+                            )}
 
-                            <button
-                              onClick={() => handleOpenEditLead(lead)}
-                              style={{
-                                padding: '5px 10px', borderRadius: 8, background: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0',
-                                border: `1px solid ${t.inputBorder}`, color: t.text,
-                                fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer',
-                              }}
-                            >
-                              Editar
-                            </button>
+                            {isDevOrAdmin && (
+                              <>
+                                <button
+                                  onClick={() => handleOpenEditLead(lead)}
+                                  style={{
+                                    padding: '5px 10px', borderRadius: 8, background: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0',
+                                    border: `1px solid ${t.inputBorder}`, color: t.text,
+                                    fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer',
+                                  }}
+                                >
+                                  Editar
+                                </button>
 
-                            <button
-                              onClick={() => handleRemoveFromCRM(lead.id)}
-                              title="Eliminar de mi CRM"
-                              style={{
-                                padding: '5px 10px', borderRadius: 8, background: 'rgba(255,80,80,0.14)',
-                                border: '1px solid rgba(255,80,80,0.3)', color: '#FF8080',
-                                fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer',
-                                display: 'inline-flex', alignItems: 'center', gap: 4,
-                              }}
-                            >
-                              <TrashIcon />
-                            </button>
+                                <button
+                                  onClick={() => handleRemoveFromCRM(lead.id)}
+                                  title="Eliminar de mi CRM"
+                                  style={{
+                                    padding: '5px 10px', borderRadius: 8, background: 'rgba(255,80,80,0.14)',
+                                    border: '1px solid rgba(255,80,80,0.3)', color: '#FF8080',
+                                    fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer',
+                                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                                  }}
+                                >
+                                  <TrashIcon />
+                                </button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -846,8 +969,143 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
-        {/* ── TAB 3: LEADS (ÚLTIMO TAB — TODOS LOS REGISTROS) ── */}
-        {activeTab === 'leads' && isDev && (
+        {/* ── TAB 2: REPORTE DE VENTAS & FINANZAS (SOLO ADMINS) ── */}
+        {activeTab === 'ventas' && isDevOrAdmin && reporteVentas && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            {/* Tarjetas de Resumen Financiero */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+              <div style={{ background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20 }}>
+                <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: t.subtext, textTransform: 'uppercase' }}>Ventas Brutas Totales</span>
+                <div style={{ fontSize: 24, fontWeight: 800, color: '#38BDF8', fontFamily: 'monospace', marginTop: 6 }}>
+                  {formatCOP(reporteVentas.resumen.totalVentasBrutas)}
+                </div>
+                <span style={{ fontSize: 11, color: t.subtext }}>Declaraciones + Consultorías</span>
+              </div>
+
+              <div style={{ background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20 }}>
+                <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: t.subtext, textTransform: 'uppercase' }}>Costos Comisiones Totales</span>
+                <div style={{ fontSize: 24, fontWeight: 800, color: '#FBBF24', fontFamily: 'monospace', marginTop: 6 }}>
+                  {formatCOP(reporteVentas.resumen.totalCostosComisiones)}
+                </div>
+                <span style={{ fontSize: 11, color: t.subtext }}>Contadores + Vend + Ref + Dev</span>
+              </div>
+
+              <div style={{ background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20 }}>
+                <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: t.subtext, textTransform: 'uppercase' }}>Utilidad Neta Plataforma</span>
+                <div style={{ fontSize: 24, fontWeight: 800, color: '#4ED6A1', fontFamily: 'monospace', marginTop: 6 }}>
+                  {formatCOP(reporteVentas.resumen.totalUtilidadPlataforma)}
+                </div>
+                <span style={{ fontSize: 11, color: t.subtext }}>Ganancia limpia para la empresa</span>
+              </div>
+            </div>
+
+            {/* Tabla de Desglose por Cliente */}
+            <div style={{ background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 20, overflow: 'hidden' }}>
+              <div style={{ padding: '16px 20px', borderBottom: `1px solid ${t.border}`, fontWeight: 700 }}>
+                Desglose Financiero por Cliente Confirmado
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: t.tableHeaderBg, borderBottom: `1px solid ${t.border}`, fontFamily: 'var(--mono)', textTransform: 'uppercase', color: t.tableHeaderColor }}>
+                      <th style={{ padding: '12px 16px' }}>Cliente</th>
+                      <th style={{ padding: '12px 16px' }}>Venta Total</th>
+                      <th style={{ padding: '12px 16px' }}>Comisión Contador</th>
+                      <th style={{ padding: '12px 16px' }}>Comisión Vendedor</th>
+                      <th style={{ padding: '12px 16px' }}>Comisión Referido</th>
+                      <th style={{ padding: '12px 16px' }}>Desarrollo (5%)</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right' }}>Utilidad Plataforma</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reporteVentas.ventas.map((v) => (
+                      <tr key={v.id} style={{ borderBottom: `1px solid ${t.tableRowBorder}` }}>
+                        <td style={{ padding: '12px 16px', fontWeight: 600 }}>{v.nombre}</td>
+                        <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#38BDF8' }}>{formatCOP(v.totalVentaCliente)}</td>
+                        <td style={{ padding: '12px 16px', fontFamily: 'monospace' }}>{formatCOP(v.amtContador)} ({v.contadorNombre})</td>
+                        <td style={{ padding: '12px 16px', fontFamily: 'monospace' }}>{formatCOP(v.amtVendedor)} ({v.vendedorNombre})</td>
+                        <td style={{ padding: '12px 16px', fontFamily: 'monospace' }}>{formatCOP(v.amtReferido)} ({v.referidoNombre})</td>
+                        <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#C084FC' }}>{formatCOP(v.amtDesarrollo)}</td>
+                        <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#4ED6A1', textAlign: 'right', fontWeight: 700 }}>{formatCOP(v.amtPlataforma)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB 3: MIS LINKS DE REFERIDO ── */}
+        {activeTab === 'links' && (
+          <div style={{ maxWidth: 650, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div style={{ background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 20, padding: 24 }}>
+              <h3 style={{ margin: '0 0 8px', fontSize: 18, color: '#7DD3FC', fontFamily: 'var(--display)' }}>
+                1. Link de Referido para Cuestionario / Test
+              </h3>
+              <p style={{ margin: '0 0 14px', fontSize: 13, color: t.subtext }}>
+                Comparte este enlace para que las personas realicen el test tributario. Tu código de referido se registrará automáticamente.
+              </p>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  readOnly
+                  value={testLink}
+                  style={{
+                    flex: 1, padding: '10px 14px', borderRadius: 10,
+                    background: t.inputBg, border: `1px solid ${t.inputBorder}`,
+                    color: t.inputColor, fontSize: 13, fontFamily: 'monospace',
+                  }}
+                />
+                <button
+                  onClick={() => copyToClipboard(testLink, 'test')}
+                  style={{
+                    padding: '10px 18px', borderRadius: 10, background: '#3D6BFF',
+                    color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer',
+                  }}
+                >
+                  {copiedLinkText === 'test' ? '¡Copiado! ✓' : 'Copiar Link 📋'}
+                </button>
+              </div>
+            </div>
+
+            <div style={{ background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 20, padding: 24 }}>
+              <h3 style={{ margin: '0 0 8px', fontSize: 18, color: '#4ED6A1', fontFamily: 'var(--display)' }}>
+                2. Link de Referido Directo a Agendar Asesoría
+              </h3>
+              <p style={{ margin: '0 0 14px', fontSize: 13, color: t.subtext }}>
+                Comparte este enlace para llevar al cliente directamente a agendar y pagar la consultoría ($100.000 COP).
+              </p>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  readOnly
+                  value={agendarLink}
+                  style={{
+                    flex: 1, padding: '10px 14px', borderRadius: 10,
+                    background: t.inputBg, border: `1px solid ${t.inputBorder}`,
+                    color: t.inputColor, fontSize: 13, fontFamily: 'monospace',
+                  }}
+                />
+                <button
+                  onClick={() => copyToClipboard(agendarLink, 'agendar')}
+                  style={{
+                    padding: '10px 18px', borderRadius: 10, background: '#0E7C66',
+                    color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer',
+                  }}
+                >
+                  {copiedLinkText === 'agendar' ? '¡Copiado! ✓' : 'Copiar Link 📋'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB 4: CALCULADORA DE COMISIONES ── */}
+        {activeTab === 'calculadora' && <CalculadoraComisiones />}
+
+        {/* ── TAB 5: LEADS (ÚLTIMO TAB — SOLO ADMINS) ── */}
+        {activeTab === 'leads' && isDevOrAdmin && (
           <div style={{
             background: t.cardBg, backdropFilter: 'blur(20px)',
             border: `1px solid ${t.border}`, borderRadius: 20,
@@ -902,22 +1160,20 @@ export default function AdminDashboardPage() {
                         </select>
                       </td>
 
-                      {/* Etapa Embudo */}
+                      {/* Etapa */}
                       <td style={{ padding: '16px 18px' }}>
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: t.subtext, textTransform: 'capitalize' }}>
-                          {lead.etapa || 'consultoria'}
-                        </span>
+                        {renderEtapaBadge(lead.etapa)}
                       </td>
 
-                      {/* Asignar a CRM */}
+                      {/* Asignar Contador */}
                       <td style={{ padding: '16px 18px' }}>
                         <select
                           value={lead.contador_id || ''}
-                          onChange={(e) => handleAssignContador(lead.id, e.target.value || null)}
+                          onChange={(e) => handleUpdateAssignment(lead.id, 'contador_id', e.target.value || null)}
                           style={{
                             background: lead.contador_id ? 'rgba(61,107,255,0.18)' : t.inputBg,
                             border: lead.contador_id ? '1px solid rgba(61,107,255,0.5)' : `1px solid ${t.inputBorder}`,
-                            borderRadius: 8, color: t.inputColor, padding: '6px 10px', fontSize: 11, fontFamily: 'var(--body)', outline: 'none',
+                            borderRadius: 8, color: t.inputColor, padding: '4px 8px', fontSize: 11, fontFamily: 'var(--body)', outline: 'none',
                           }}
                         >
                           <option value="" style={{ background: t.modalBg, color: t.text }}>Sin asignar</option>
@@ -929,56 +1185,17 @@ export default function AdminDashboardPage() {
                         </select>
                       </td>
 
-                      {/* Acciones LEADS */}
                       <td style={{ padding: '16px 18px', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap', alignItems: 'center' }}>
-                          <Link
-                            href={`/r/${lead.slug_publico}`}
-                            target="_blank"
-                            style={{
-                              padding: '5px 10px', borderRadius: 8, background: 'rgba(61,107,255,0.12)',
-                              border: '1px solid rgba(61,107,255,0.3)', color: isDark ? '#7DD3FC' : '#0284C7',
-                              fontFamily: 'var(--mono)', fontSize: 11, textDecoration: 'none',
-                            }}
-                          >
-                            Ver Resultado ↗
-                          </Link>
-
-                          <button
-                            onClick={() => handleOpenEditLead(lead)}
-                            style={{
-                              padding: '5px 10px', borderRadius: 8, background: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0',
-                              border: `1px solid ${t.inputBorder}`, color: t.text,
-                              fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer',
-                            }}
-                          >
-                            Editar
-                          </button>
-
-                          <button
-                            onClick={() => setSelectedRespuestasLead(lead)}
-                            style={{
-                              padding: '5px 10px', borderRadius: 8, background: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0',
-                              border: `1px solid ${t.inputBorder}`, color: t.text,
-                              fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer',
-                            }}
-                          >
-                            Respuestas
-                          </button>
-
-                          <button
-                            onClick={() => handleDeleteLeadCompletely(lead.id)}
-                            title="Eliminar lead completamente del sistema"
-                            style={{
-                              padding: '5px 10px', borderRadius: 8, background: 'rgba(255,80,80,0.18)',
-                              border: '1px solid rgba(255,80,80,0.35)', color: '#FF8080',
-                              fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer',
-                              display: 'inline-flex', alignItems: 'center', gap: 6,
-                            }}
-                          >
-                            <TrashIcon />
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => handleRemoveFromCRM(lead.id)}
+                          style={{
+                            padding: '5px 10px', borderRadius: 8, background: 'rgba(255,80,80,0.14)',
+                            border: '1px solid rgba(255,80,80,0.3)', color: '#FF8080',
+                            fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer',
+                          }}
+                        >
+                          Eliminar
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -988,86 +1205,103 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
-        {/* ── TAB 2: USUARIOS ── */}
-        {activeTab === 'usuarios' && isDev && (
+        {/* ── TAB 6: USUARIOS (SOLO ADMINS) ── */}
+        {activeTab === 'usuarios' && isDevOrAdmin && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24 }}>
             {/* Form Crear Usuario */}
             <div style={{
-              background: t.cardBg, backdropFilter: 'blur(20px)',
-              border: `1px solid ${t.border}`, borderRadius: 20,
-              padding: 24, boxShadow: isDark ? '0 0 40px rgba(0,0,0,0.5)' : '0 10px 30px rgba(0,0,0,0.05)',
+              background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 20, padding: 24,
             }}>
-              <h3 style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 18, marginTop: 0, marginBottom: 16, color: t.text }}>
+              <h3 style={{ margin: '0 0 16px', fontSize: 18, color: t.text, fontFamily: 'var(--display)' }}>
                 Crear Nuevo Usuario
               </h3>
-
               {userMsg && (
                 <div style={{
-                  marginBottom: 16, padding: '10px 14px', borderRadius: 10,
-                  background: userMsg.error ? 'rgba(255,80,80,0.15)' : 'rgba(78,214,161,0.15)',
-                  border: `1px solid ${userMsg.error ? 'rgba(255,100,100,0.3)' : 'rgba(78,214,161,0.3)'}`,
-                  color: userMsg.error ? '#FF8080' : (isDark ? '#4ED6A1' : '#16A34A'), fontSize: 12,
+                  padding: '10px 14px', borderRadius: 10, marginBottom: 16, fontSize: 12,
+                  background: userMsg.error ? 'rgba(255,80,80,0.14)' : 'rgba(78,214,161,0.14)',
+                  border: `1px solid ${userMsg.error ? 'rgba(255,80,80,0.3)' : 'rgba(78,214,161,0.3)'}`,
+                  color: userMsg.error ? '#FF8080' : '#4ED6A1',
                 }}>
                   {userMsg.text}
                 </div>
               )}
-
               <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div>
-                  <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: t.subtext, marginBottom: 6 }}>
+                  <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--mono)', textTransform: 'uppercase', color: t.subtext, marginBottom: 4 }}>
                     Nombre Completo
                   </label>
                   <input
-                    type="text" required value={newUserNombre} onChange={(e) => setNewUserNombre(e.target.value)}
-                    placeholder="Ej. Carlos Contador"
-                    style={{ width: '100%', padding: '10px 14px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: 10, color: t.inputColor, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                    type="text"
+                    required
+                    value={newUserNombre}
+                    onChange={(e) => setNewUserNombre(e.target.value)}
+                    placeholder="Ej. Juan Pérez"
+                    style={{
+                      width: '100%', padding: '10px 12px', borderRadius: 10,
+                      background: t.inputBg, border: `1px solid ${t.inputBorder}`, color: t.inputColor, fontSize: 13,
+                    }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: t.subtext, marginBottom: 6 }}>
+                  <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--mono)', textTransform: 'uppercase', color: t.subtext, marginBottom: 4 }}>
                     Correo Electrónico
                   </label>
                   <input
-                    type="email" required value={newUserEmail} onChange={(e) => setNewUserEmail(e.target.value)}
-                    placeholder="carlos@stakeholders.co"
-                    style={{ width: '100%', padding: '10px 14px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: 10, color: t.inputColor, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                    type="email"
+                    required
+                    value={newUserEmail}
+                    onChange={(e) => setNewUserEmail(e.target.value)}
+                    placeholder="usuario@ejemplo.com"
+                    style={{
+                      width: '100%', padding: '10px 12px', borderRadius: 10,
+                      background: t.inputBg, border: `1px solid ${t.inputBorder}`, color: t.inputColor, fontSize: 13,
+                    }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: t.subtext, marginBottom: 6 }}>
+                  <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--mono)', textTransform: 'uppercase', color: t.subtext, marginBottom: 4 }}>
                     Contraseña
                   </label>
                   <input
-                    type="password" required value={newUserPassword} onChange={(e) => setNewUserPassword(e.target.value)}
+                    type="password"
+                    required
+                    value={newUserPassword}
+                    onChange={(e) => setNewUserPassword(e.target.value)}
                     placeholder="••••••••"
-                    style={{ width: '100%', padding: '10px 14px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: 10, color: t.inputColor, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                    style={{
+                      width: '100%', padding: '10px 12px', borderRadius: 10,
+                      background: t.inputBg, border: `1px solid ${t.inputBorder}`, color: t.inputColor, fontSize: 13,
+                    }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: t.subtext, marginBottom: 6 }}>
+                  <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--mono)', textTransform: 'uppercase', color: t.subtext, marginBottom: 4 }}>
                     Rol / Nivel de Permisos
                   </label>
                   <select
                     value={newUserRol}
                     onChange={(e) => setNewUserRol(e.target.value as any)}
-                    style={{ width: '100%', padding: '10px 14px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: 10, color: t.inputColor, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                    style={{
+                      width: '100%', padding: '10px 12px', borderRadius: 10,
+                      background: t.inputBg, border: `1px solid ${t.inputBorder}`, color: t.inputColor, fontSize: 13,
+                    }}
                   >
-                    <option value="contador" style={{ background: t.modalBg, color: t.text }}>Contador (CRM + Pool de leads)</option>
+                    <option value="contador" style={{ background: t.modalBg, color: t.text }}>Contador (Declaraciones asignadas)</option>
                     <option value="vendedor" style={{ background: t.modalBg, color: t.text }}>Vendedor (Clientes propios + Referidos)</option>
-                    <option value="referido" style={{ background: t.modalBg, color: t.text }}>Referido (Links + Ganancias)</option>
-                    <option value="admin" style={{ background: t.modalBg, color: t.text }}>Admin (Acceso total)</option>
+                    <option value="referido" style={{ background: t.modalBg, color: t.text }}>Referido (Links de atracción)</option>
+                    <option value="admin" style={{ background: t.modalBg, color: t.text }}>Administrador (Control total)</option>
                   </select>
                 </div>
 
                 <button
                   type="submit"
                   style={{
-                    marginTop: 8, padding: '12px', borderRadius: 999, fontWeight: 700, fontSize: 13,
-                    background: 'linear-gradient(135deg,#3D6BFF,#6B8FFF)', color: '#FFF', border: 'none',
-                    fontFamily: 'var(--display)', cursor: 'pointer', boxShadow: '0 4px 20px rgba(61,107,255,0.4)',
+                    marginTop: 8, padding: '12px', borderRadius: 10,
+                    background: '#3D6BFF', color: '#fff', border: 'none',
+                    fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--body)',
                   }}
                 >
                   + Crear Usuario
@@ -1076,45 +1310,34 @@ export default function AdminDashboardPage() {
             </div>
 
             {/* Lista Usuarios */}
-            <div style={{
-              background: t.cardBg, backdropFilter: 'blur(20px)',
-              border: `1px solid ${t.border}`, borderRadius: 20,
-              padding: 24, boxShadow: isDark ? '0 0 40px rgba(0,0,0,0.5)' : '0 10px 30px rgba(0,0,0,0.05)',
-            }}>
-              <h3 style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 18, marginTop: 0, marginBottom: 16, color: t.text }}>
+            <div style={{ background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 20, padding: 24 }}>
+              <h3 style={{ margin: '0 0 16px', fontSize: 18, color: t.text, fontFamily: 'var(--display)' }}>
                 Usuarios en Stakeholders ({usuarios.length})
               </h3>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {usuarios.map((u) => (
-                  <div key={u.id} style={{
-                    padding: '12px 16px', borderRadius: 12, background: isDark ? 'rgba(255,255,255,0.04)' : '#F1F5F9',
-                    border: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  }}>
+                  <div
+                    key={u.id}
+                    style={{
+                      padding: '12px 16px', borderRadius: 12,
+                      background: isDark ? 'rgba(255,255,255,0.03)' : '#F1F5F9',
+                      border: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    }}
+                  >
                     <div>
-                      <span style={{ fontWeight: 700, color: t.text, display: 'block' }}>{u.nombre}</span>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: t.subtext }}>{u.email}</span>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{u.nombre}</div>
+                      <div style={{ fontSize: 12, color: t.subtext }}>{u.email}</div>
                     </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{
-                        fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase',
-                        padding: '3px 8px', borderRadius: 999,
-                        background: u.rol === 'desarrollador' ? 'rgba(61,107,255,0.15)' : 'rgba(78,214,161,0.15)',
-                        color: u.rol === 'desarrollador' ? (isDark ? '#7DD3FC' : '#0284C7') : (isDark ? '#4ED6A1' : '#16A34A'),
+                        padding: '3px 8px', borderRadius: 999, fontSize: 10, fontFamily: 'var(--mono)', textTransform: 'uppercase',
+                        background: 'rgba(61,107,255,0.14)', color: isDark ? '#7DD3FC' : '#0284C7', border: '1px solid rgba(61,107,255,0.3)',
                       }}>
                         {u.rol}
                       </span>
-
-                      <button
-                        onClick={() => handleToggleUserActivo(u)}
-                        style={{
-                          background: 'none', border: 'none', cursor: 'pointer', fontSize: 11,
-                          color: u.activo ? (isDark ? '#4ED6A1' : '#16A34A') : '#FF8080', fontFamily: 'var(--mono)',
-                        }}
-                      >
-                        {u.activo ? 'Activo ✓' : 'Inactivo ✕'}
-                      </button>
+                      <span style={{ fontSize: 11, color: u.activo ? (isDark ? '#4ED6A1' : '#16A34A') : '#FF8080' }}>
+                        {u.activo ? 'Activo ✓' : 'Inactivo'}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -1122,211 +1345,146 @@ export default function AdminDashboardPage() {
             </div>
           </div>
         )}
-
       </div>
 
-      {/* ── MODAL: EDITAR LEAD ── */}
-      {editingLead && (
+      {/* ── MODAL FINANZAS / RESPUESTAS TEST ── */}
+      {selectedRespuestasLead && (
         <div style={{
-          position: 'fixed', inset: 0, zIndex: 300,
+          position: 'fixed', inset: 0, zIndex: 100,
+          background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
         }}>
-          <div style={{ position: 'absolute', inset: 0, background: isDark ? 'rgba(0,0,0,0.85)' : 'rgba(15,23,42,0.6)', backdropFilter: 'blur(12px)' }} onClick={() => setEditingLead(null)} />
           <div style={{
-            position: 'relative', width: '100%', maxWidth: 500,
-            background: t.modalBg, border: `1px solid ${t.border}`, borderRadius: 24,
-            padding: '28px 24px', boxShadow: '0 0 80px rgba(61,107,255,0.25)', color: t.text,
+            background: t.modalBg, border: `1px solid ${t.border}`, borderRadius: 20,
+            maxWidth: 600, width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: 24, color: t.text,
           }}>
-            <button
-              onClick={() => setEditingLead(null)}
-              style={{ position: 'absolute', top: 18, right: 18, background: 'none', border: 'none', color: t.text, fontSize: 18, cursor: 'pointer' }}
-            >
-              ✕
-            </button>
-
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: '#3D6BFF', display: 'block', marginBottom: 4 }}>
-              Edición de Datos
-            </span>
-            <h2 style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 20, margin: '0 0 20px', color: t.text }}>
-              Editar Lead: {editingLead.nombre}
-            </h2>
-
-            <form onSubmit={handleSaveEditLead} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div>
-                <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 10, color: t.subtext, marginBottom: 6 }}>
-                  Nombre Completo
-                </label>
+                <h3 style={{ margin: 0, fontSize: 18, fontFamily: 'var(--display)' }}>Finanzas del Test</h3>
+                <p style={{ margin: 0, fontSize: 12, color: t.subtext }}>Cliente: {selectedRespuestasLead.nombre}</p>
+              </div>
+              <button onClick={() => setSelectedRespuestasLead(null)} style={{ background: 'none', border: 'none', color: t.text, fontSize: 20, cursor: 'pointer' }}>✕</button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ padding: 12, borderRadius: 10, background: isDark ? 'rgba(255,255,255,0.04)' : '#F1F5F9' }}>
+                <span style={{ fontSize: 11, color: t.subtext, display: 'block' }}>Patrimonio Bruto</span>
+                <strong style={{ fontSize: 16, color: '#F0B93C' }}>{selectedRespuestasLead.barra_patrimonio}/100</strong>
+              </div>
+              <div style={{ padding: 12, borderRadius: 10, background: isDark ? 'rgba(255,255,255,0.04)' : '#F1F5F9' }}>
+                <span style={{ fontSize: 11, color: t.subtext, display: 'block' }}>Ingresos Brutos</span>
+                <strong style={{ fontSize: 16, color: '#4ED6A1' }}>{selectedRespuestasLead.barra_ingresos}/100</strong>
+              </div>
+              <div style={{ padding: 12, borderRadius: 10, background: isDark ? 'rgba(255,255,255,0.04)' : '#F1F5F9' }}>
+                <span style={{ fontSize: 11, color: t.subtext, display: 'block' }}>Consumos Tarjetas / Créditos</span>
+                <strong style={{ fontSize: 16, color: '#FF6B8A' }}>{selectedRespuestasLead.barra_creditos}/100</strong>
+              </div>
+              <div style={{ padding: 12, borderRadius: 10, background: isDark ? 'rgba(255,255,255,0.04)' : '#F1F5F9' }}>
+                <span style={{ fontSize: 11, color: t.subtext, display: 'block' }}>Consignaciones / Movimientos Bancarios</span>
+                <strong style={{ fontSize: 16, color: '#7DD3FC' }}>{selectedRespuestasLead.barra_movimientos}/100</strong>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 20, textAlign: 'right' }}>
+              <button
+                onClick={() => setSelectedRespuestasLead(null)}
+                style={{ padding: '8px 16px', borderRadius: 8, background: '#3D6BFF', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL EDITAR LEAD ── */}
+      {editingLead && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 100,
+          background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+        }}>
+          <div style={{
+            background: t.modalBg, border: `1px solid ${t.border}`, borderRadius: 20,
+            maxWidth: 500, width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: 24, color: t.text,
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ margin: 0, fontSize: 18, fontFamily: 'var(--display)' }}>Editar Cliente</h3>
+              <button onClick={() => setEditingLead(null)} style={{ background: 'none', border: 'none', color: t.text, fontSize: 20, cursor: 'pointer' }}>✕</button>
+            </div>
+
+            <form onSubmit={handleSaveEditLead} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 11, color: t.subtext, textTransform: 'uppercase' }}>Nombre</label>
                 <input
-                  type="text" required value={editNombre} onChange={(e) => setEditNombre(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: 10, color: t.inputColor, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                  type="text"
+                  value={editNombre}
+                  onChange={(e) => setEditNombre(e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, background: t.inputBg, border: `1px solid ${t.inputBorder}`, color: t.inputColor }}
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
-                <div>
-                  <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 10, color: t.subtext, marginBottom: 6 }}>
-                    Cédula / NIT
-                  </label>
-                  <input
-                    type="text" required value={editCedula} onChange={(e) => setEditCedula(e.target.value)}
-                    style={{ width: '100%', padding: '10px 14px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: 10, color: t.inputColor, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 10, color: t.subtext, marginBottom: 6 }}>
-                    Edad
-                  </label>
-                  <input
-                    type="number" required value={editEdad} onChange={(e) => setEditEdad(Number(e.target.value))}
-                    style={{ width: '100%', padding: '10px 14px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: 10, color: t.inputColor, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
-                  />
-                </div>
+              <div>
+                <label style={{ fontSize: 11, color: t.subtext, textTransform: 'uppercase' }}>Cédula</label>
+                <input
+                  type="text"
+                  value={editCedula}
+                  onChange={(e) => setEditCedula(e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, background: t.inputBg, border: `1px solid ${t.inputBorder}`, color: t.inputColor }}
+                />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 10, color: t.subtext, marginBottom: 6 }}>
-                    Celular
-                  </label>
-                  <input
-                    type="text" value={editCelular} onChange={(e) => setEditCelular(e.target.value)}
-                    style={{ width: '100%', padding: '10px 14px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: 10, color: t.inputColor, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 10, color: t.subtext, marginBottom: 6 }}>
-                    Correo Electrónico
-                  </label>
-                  <input
-                    type="email" value={editCorreo} onChange={(e) => setEditCorreo(e.target.value)}
-                    style={{ width: '100%', padding: '10px 14px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: 10, color: t.inputColor, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
-                  />
-                </div>
+              <div>
+                <label style={{ fontSize: 11, color: t.subtext, textTransform: 'uppercase' }}>Celular</label>
+                <input
+                  type="text"
+                  value={editCelular}
+                  onChange={(e) => setEditCelular(e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, background: t.inputBg, border: `1px solid ${t.inputBorder}`, color: t.inputColor }}
+                />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 10, color: t.subtext, marginBottom: 6 }}>
-                    Estado de Pago
-                  </label>
-                  <select
-                    value={editPagado ? 'true' : 'false'}
-                    onChange={(e) => setEditPagado(e.target.value === 'true')}
-                    style={{ width: '100%', padding: '10px 14px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: 10, color: t.inputColor, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
-                  >
-                    <option value="false" style={{ background: t.modalBg, color: t.text }}>❌ No Pagado</option>
-                    <option value="true" style={{ background: t.modalBg, color: t.text }}>✅ Pagado (CRM)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 10, color: t.subtext, marginBottom: 6 }}>
-                    Etapa del Embudo
-                  </label>
-                  <select
-                    value={editEtapa}
-                    onChange={(e) => setEditEtapa(e.target.value as any)}
-                    style={{ width: '100%', padding: '10px 14px', background: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: 10, color: t.inputColor, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
-                  >
-                    <option value="consultoria" style={{ background: t.modalBg, color: t.text }}>01. Consultoría</option>
-                    <option value="documentos" style={{ background: t.modalBg, color: t.text }}>02. Documentos</option>
-                    <option value="anticipo" style={{ background: t.modalBg, color: t.text }}>03. Anticipo (50%)</option>
-                    <option value="declaracion" style={{ background: t.modalBg, color: t.text }}>04. Declaración</option>
-                    <option value="entrega" style={{ background: t.modalBg, color: t.text }}>05. Entrega Final</option>
-                  </select>
-                </div>
+              <div>
+                <label style={{ fontSize: 11, color: t.subtext, textTransform: 'uppercase' }}>Valor Declaración (COP)</label>
+                <input
+                  type="number"
+                  value={editValorDeclaracion}
+                  onChange={(e) => setEditValorDeclaracion(Number(e.target.value))}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, background: t.inputBg, border: `1px solid ${t.inputBorder}`, color: t.inputColor, fontFamily: 'monospace', fontWeight: 700 }}
+                />
               </div>
 
-              <div style={{ display: 'flex', gap: 12, marginTop: 10 }}>
+              <div>
+                <label style={{ fontSize: 11, color: t.subtext, textTransform: 'uppercase' }}>Estado de Pago</label>
+                <select
+                  value={editPagado ? 'true' : 'false'}
+                  onChange={(e) => setEditPagado(e.target.value === 'true')}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, background: t.inputBg, border: `1px solid ${t.inputBorder}`, color: t.inputColor }}
+                >
+                  <option value="false" style={{ background: t.modalBg, color: t.text }}>❌ No Pagado</option>
+                  <option value="true" style={{ background: t.modalBg, color: t.text }}>✅ PAGADO (CRM)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 12 }}>
                 <button
-                  type="button" onClick={() => setEditingLead(null)}
-                  style={{ flex: 1, padding: 12, borderRadius: 999, background: 'none', border: `1px solid ${t.inputBorder}`, color: t.text, fontSize: 13, cursor: 'pointer' }}
+                  type="button"
+                  onClick={() => setEditingLead(null)}
+                  style={{ padding: '8px 14px', borderRadius: 8, background: 'transparent', border: `1px solid ${t.inputBorder}`, color: t.text, cursor: 'pointer' }}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  style={{ flex: 1, padding: 12, borderRadius: 999, background: 'linear-gradient(135deg,#3D6BFF,#6B8FFF)', border: 'none', color: '#FFF', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--display)' }}
+                  style={{ padding: '8px 16px', borderRadius: 8, background: '#3D6BFF', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 }}
                 >
-                  Guardar Cambios ✓
+                  Guardar Cambios
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-
-      {/* ── MODAL POPUP: VER RESPUESTAS ── */}
-      {selectedRespuestasLead && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 300,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
-        }}>
-          <div style={{ position: 'absolute', inset: 0, background: isDark ? 'rgba(0,0,0,0.85)' : 'rgba(15,23,42,0.6)', backdropFilter: 'blur(12px)' }} onClick={() => setSelectedRespuestasLead(null)} />
-          <div style={{
-            position: 'relative', width: '100%', maxWidth: 560, maxHeight: '85vh', overflow: 'auto',
-            background: t.modalBg, border: `1px solid ${t.border}`, borderRadius: 24,
-            padding: '28px 24px', boxShadow: '0 0 80px rgba(61,107,255,0.25)', color: t.text,
-          }}>
-            <button
-              onClick={() => setSelectedRespuestasLead(null)}
-              style={{ position: 'absolute', top: 18, right: 18, background: 'none', border: 'none', color: t.text, fontSize: 18, cursor: 'pointer' }}
-            >
-              ✕
-            </button>
-
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: '#3D6BFF', display: 'block', marginBottom: 4 }}>
-              Cuestionario Respondido
-            </span>
-            <h2 style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 22, margin: '0 0 16px', color: t.text }}>
-              Respuestas de {selectedRespuestasLead.nombre}
-            </h2>
-
-            {selectedRespuestasLead.respuestas?.[0]?.payload ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
-                {Object.entries(selectedRespuestasLead.respuestas[0].payload).map(([key, val]) => (
-                  <div key={key} style={{ padding: '10px 14px', borderRadius: 10, background: isDark ? 'rgba(255,255,255,0.04)' : '#F1F5F9', border: `1px solid ${t.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: t.subtext, textTransform: 'uppercase' }}>
-                      {key}
-                    </span>
-                    <span style={{ fontWeight: 600, color: t.text, textAlign: 'right' }}>
-                      {typeof val === 'number' && (key.toLowerCase().includes('ingreso') || key.toLowerCase().includes('deuda') || key.toLowerCase().includes('valor') || key.toLowerCase().includes('costo'))
-                        ? formatCOP(val)
-                        : String(val)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{ padding: 20, textAlign: 'center', color: t.subtext }}>
-                No hay payload de respuestas registrado para este lead.
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Styles for mobile responsive & animations */}
-      <style>{`
-        @keyframes spinLoading { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        @keyframes popIn { from { opacity: 0; transform: scale(.9); } to { opacity: 1; transform: scale(1); } }
-
-        @media (max-width: 900px) {
-          .admin-sidebar {
-            transform: translateX(-100%);
-          }
-          .admin-sidebar.mobile-open {
-            transform: translateX(0);
-          }
-          .admin-main {
-            margin-left: 0 !important;
-            padding-top: 16px !important;
-          }
-          .mobile-header {
-            display: flex !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }

@@ -303,9 +303,13 @@ export type Database = {
           nombre: string
           ocupacion: string
           pagado?: boolean
+          referrer_id?: string | null
+          seller_id?: string | null
           slug_publico: string
+          source?: string | null
           topes_superados: string[]
           updated_at: string | null
+          valor_declaracion?: number | null
         }
         Insert: {
           arquetipo_id?: number | null
@@ -328,9 +332,13 @@ export type Database = {
           nombre: string
           ocupacion: string
           pagado?: boolean
+          referrer_id?: string | null
+          seller_id?: string | null
           slug_publico?: string
+          source?: string | null
           topes_superados?: string[]
           updated_at?: string | null
+          valor_declaracion?: number | null
         }
         Update: {
           arquetipo_id?: number | null
@@ -353,9 +361,13 @@ export type Database = {
           nombre?: string
           ocupacion?: string
           pagado?: boolean
+          referrer_id?: string | null
+          seller_id?: string | null
           slug_publico?: string
+          source?: string | null
           topes_superados?: string[]
           updated_at?: string | null
+          valor_declaracion?: number | null
         }
         Relationships: [
           {
