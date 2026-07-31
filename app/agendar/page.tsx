@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { setRefCookie } from '@/lib/referral';
 
 interface Contador {
   id: number;
@@ -20,6 +21,12 @@ function AgendarContent() {
   const [medioContacto, setMedioContacto] = useState<'llamada' | 'videollamada' | 'whatsapp'>('whatsapp');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Capturar cookie de referido si viene con ?ref=
+  useEffect(() => {
+    const ref = searchParams.get('ref');
+    if (ref) setRefCookie(ref); // First-touch: no sobreescribe si ya existe
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

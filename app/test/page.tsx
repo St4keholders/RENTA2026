@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import '@/app/stakeholders.css';
+import { setRefCookie } from '@/lib/referral';
 
 interface FormData {
   nombre: string;
@@ -97,12 +98,23 @@ function OptionBtn({ selected, onClick, children }: { selected: boolean; onClick
 }
 
 /* ── Main Component ──────────────────────────────────────────────────── */
-export default function TestPage() {
+function TestContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [refSlug, setRefSlug] = useState<string | null>(null);
+
+  // Capturar y guardar cookie de referido al llegar con ?ref=
+  useEffect(() => {
+    const ref = searchParams.get('ref');
+    if (ref) {
+      setRefCookie(ref); // First-touch: no sobreescribe si ya existe
+      setRefSlug(ref);
+    }
+  }, [searchParams]);
 
   const [form, setForm] = useState<FormData>({
     nombre: '', cedula: '', edad: 28, ocupacion: 'empleado',
@@ -195,7 +207,9 @@ export default function TestPage() {
   const handleSubmit = async () => {
     setLoading(true); setErrorMsg('');
     try {
-      const res = await fetch('/api/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      // Incluir ref slug para atribución de referido en el backend
+      const body = { ...form, ...(refSlug ? { ref: refSlug } : {}) };
+      const res = await fetch('/api/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al procesar el cuestionario');
       router.push(`/r/${data.slugPublico}`);
@@ -552,5 +566,13 @@ export default function TestPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function TestPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>Cargando...</div>}>
+      <TestContent />
+    </Suspense>
   );
 }

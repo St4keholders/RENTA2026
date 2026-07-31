@@ -24,7 +24,31 @@ export async function GET() {
       .order('created_at', { ascending: false });
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ leads: leads || [] });
+
+    // Consultar órdenes de pago (orders no tiene FK explícita en PostgREST, se resuelve por separado)
+    const leadIds = (leads || []).map((l) => l.id).filter(Boolean);
+    let ordersByLeadId: Record<string, Array<{ id: string; reference: string; status: string; amount_in_cents: number; created_at: string }>> = {};
+    if (leadIds.length > 0) {
+      const { data: orders } = await supabase
+        .from('orders')
+        .select('id, reference, status, amount_in_cents, created_at, lead_id')
+        .in('lead_id', leadIds)
+        .order('created_at', { ascending: false });
+      for (const o of orders || []) {
+        if (o.lead_id) {
+          if (!ordersByLeadId[o.lead_id]) ordersByLeadId[o.lead_id] = [];
+          ordersByLeadId[o.lead_id].push({ id: o.id, reference: o.reference, status: o.status, amount_in_cents: o.amount_in_cents, created_at: o.created_at });
+        }
+      }
+    }
+
+    // Fusionar órdenes con cada lead
+    const leadsWithOrders = (leads || []).map((l) => ({
+      ...l,
+      orders: ordersByLeadId[l.id] || [],
+    }));
+
+    return NextResponse.json({ leads: leadsWithOrders });
   } catch (error) {
     console.error('Error fetching admin leads:', error);
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });

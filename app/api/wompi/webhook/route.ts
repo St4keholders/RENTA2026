@@ -80,11 +80,40 @@ export async function POST(request: Request) {
       }
 
       if (leadId) {
-        // Marcar como pagado y avanzar a etapa de documentos
-        await supabase
+        // Leer datos actuales del lead para verificar referrer
+        const { data: currentLead } = await supabase
           .from('leads')
-          .update({ pagado: true, etapa: 'documentos', estado: 'agendado' })
-          .eq('id', leadId);
+          .select('referrer_id, seller_id')
+          .eq('id', leadId)
+          .single();
+
+        // Si el lead tiene referido pero no vendedor, verificar si el referido es vendedor
+        let sellerIdToSet: string | null | undefined = undefined;
+        if (currentLead?.referrer_id && !currentLead?.seller_id) {
+          const { data: referrerUser } = await supabase
+            .from('usuarios')
+            .select('id, rol')
+            .eq('id', currentLead.referrer_id)
+            .single();
+          if (referrerUser?.rol === 'vendedor') {
+            sellerIdToSet = referrerUser.id;
+            console.log(`🔗 Asignando seller_id = referrer_id (vendedor) para lead ${leadId}`);
+          }
+        }
+
+        // Marcar como pagado y avanzar a etapa de documentos
+        // Usamos condicional para mantener tipos estrictos de Supabase
+        if (sellerIdToSet !== undefined) {
+          await supabase
+            .from('leads')
+            .update({ pagado: true, etapa: 'documentos', estado: 'agendado', seller_id: sellerIdToSet } as any)
+            .eq('id', leadId);
+        } else {
+          await supabase
+            .from('leads')
+            .update({ pagado: true, etapa: 'documentos', estado: 'agendado' })
+            .eq('id', leadId);
+        }
 
         // Actualizar etapa en pipeline_leads también
         await supabase

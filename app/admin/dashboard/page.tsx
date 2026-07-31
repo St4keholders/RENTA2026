@@ -57,6 +57,7 @@ interface LeadData {
   vendedor?: { id: string; nombre: string; email: string };
   respuestas?: Array<{ payload: Record<string, any>; version_motor: string; created_at: string }>;
   ventas?: Array<{ id: string; medio_contacto?: string; fecha_consulta?: string; estado?: string }>;
+  orders?: Array<{ id: string; reference: string; status: string; amount_in_cents: number; created_at: string }>;
 }
 
 interface VentasReporte {
@@ -1542,6 +1543,56 @@ export default function AdminDashboardPage() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+              {/* ── Información de Pago (solo admin/contador) ── */}
+              {(isDevOrAdmin || isContador) && (() => {
+                const orders = selectedRespuestasLead.orders || [];
+                // Priorizar la orden APPROVED; si no, la más reciente
+                const approvedOrder = orders.find(o => o.status === 'APPROVED');
+                const displayOrder = approvedOrder || orders[0];
+                return (
+                  <div style={{ padding: '14px 16px', borderRadius: 12, background: isDark ? 'rgba(61,107,255,0.08)' : 'rgba(61,107,255,0.05)', border: '1px solid rgba(61,107,255,0.25)' }}>
+                    <span style={{ fontSize: 11, fontFamily: 'var(--mono)', textTransform: 'uppercase' as const, color: '#3D6BFF', display: 'block', marginBottom: 10, letterSpacing: '.14em' }}>
+                      Información de Pago — Consultoría
+                    </span>
+                    {displayOrder ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                          <span style={{ fontSize: 11, color: t.subtext }}>Referencia de pago</span>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 13, color: isDark ? '#7DD3FC' : '#0284C7', letterSpacing: '.04em' }}>
+                            {displayOrder.reference}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                          <span style={{ fontSize: 11, color: t.subtext }}>Estado del pago</span>
+                          <span style={{
+                            padding: '3px 10px', borderRadius: 6, fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 600,
+                            background: displayOrder.status === 'APPROVED' ? 'rgba(78,214,161,0.15)' : displayOrder.status === 'DECLINED' ? 'rgba(255,80,80,0.15)' : 'rgba(255,200,60,0.15)',
+                            color: displayOrder.status === 'APPROVED' ? '#4ED6A1' : displayOrder.status === 'DECLINED' ? '#FF8080' : '#FFC83C',
+                          }}>
+                            {displayOrder.status === 'APPROVED' ? '✅ APROBADO' : displayOrder.status === 'DECLINED' ? '❌ DECLINADO' : displayOrder.status === 'PENDING' ? '⏳ PENDIENTE' : displayOrder.status}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                          <span style={{ fontSize: 11, color: t.subtext }}>Monto</span>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 13, color: t.text }}>
+                            {formatCOP(displayOrder.amount_in_cents / 100)}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                          <span style={{ fontSize: 11, color: t.subtext }}>Fecha</span>
+                          <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: t.subtext }}>
+                            {new Date(displayOrder.created_at).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p style={{ fontSize: 12, color: t.subtext, margin: 0 }}>Sin orden de pago registrada para este cliente.</p>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* Indicadores de puntuación */}
               <div>
                 <span style={{ fontSize: 11, fontFamily: 'var(--mono)', textTransform: 'uppercase', color: t.subtext, display: 'block', marginBottom: 8 }}>
