@@ -2,7 +2,11 @@
 
 import { useState } from 'react';
 
-export default function CalculadoraComisiones() {
+interface CalculadoraComisionesProps {
+  isDark?: boolean;
+}
+
+export default function CalculadoraComisiones({ isDark = true }: CalculadoraComisionesProps) {
   const [declaracionVal, setDeclaracionVal] = useState<number>(400000);
   const [hasRef, setHasRef] = useState<boolean>(true);
   const [hasVend, setHasVend] = useState<boolean>(true);
@@ -28,26 +32,28 @@ export default function CalculadoraComisiones() {
   const formatCOP = (num: number) =>
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(num);
 
+  const subtextColor = isDark ? 'rgba(255,255,255,0.6)' : '#64748B';
+
   return (
     <div
       style={{
-        background: 'rgba(255, 255, 255, 0.04)',
+        background: isDark ? 'rgba(255, 255, 255, 0.04)' : '#FFFFFF',
         backdropFilter: 'blur(16px)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
         borderRadius: 20,
         padding: '24px',
-        color: '#fff',
+        color: isDark ? '#FFFFFF' : '#0F172A',
         maxWidth: 540,
         margin: '0 auto',
+        boxShadow: isDark ? 'none' : '0 10px 30px rgba(0,0,0,0.05)',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-        <span style={{ fontSize: 22 }}>🧮</span>
         <div>
-          <h3 style={{ margin: 0, fontSize: 18, fontFamily: 'var(--display)', color: '#7DD3FC' }}>
+          <h3 style={{ margin: 0, fontSize: 18, fontFamily: 'var(--display)', color: isDark ? '#7DD3FC' : '#0284C7' }}>
             Calculadora de Rendimiento y Reparto
           </h3>
-          <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>
+          <p style={{ margin: 0, fontSize: 12, color: subtextColor }}>
             Simula las ganancias netas por declaración según el modelo 65/10/5
           </p>
         </div>
@@ -55,7 +61,7 @@ export default function CalculadoraComisiones() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20 }}>
         <div>
-          <label style={{ display: 'block', fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 6 }}>
+          <label style={{ display: 'block', fontSize: 12, color: isDark ? 'rgba(255,255,255,0.7)' : '#475569', marginBottom: 6 }}>
             Valor estimado de la declaración (COP)
           </label>
           <input
@@ -68,18 +74,19 @@ export default function CalculadoraComisiones() {
               width: '100%',
               padding: '12px 14px',
               borderRadius: 10,
-              background: 'rgba(0,0,0,0.4)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              color: '#38BDF8',
+              background: isDark ? 'rgba(0,0,0,0.4)' : '#F1F5F9',
+              border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : '#CBD5E1'}`,
+              color: isDark ? '#38BDF8' : '#0284C7',
               fontSize: 16,
               fontWeight: 700,
               fontFamily: 'monospace',
+              outline: 'none',
             }}
           />
         </div>
 
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', color: isDark ? '#FFFFFF' : '#0F172A' }}>
             <input
               type="checkbox"
               checked={hasRef}
@@ -89,7 +96,7 @@ export default function CalculadoraComisiones() {
             ¿Viene por Referido? ({refPct}%)
           </label>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', color: isDark ? '#FFFFFF' : '#0F172A' }}>
             <input
               type="checkbox"
               checked={hasVend}
@@ -103,106 +110,111 @@ export default function CalculadoraComisiones() {
 
       {/* Resultados de reparto */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {/* Contador */}
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            padding: '10px 14px',
-            borderRadius: 10,
-            background: 'rgba(56, 189, 248, 0.12)',
-            border: '1px solid rgba(56, 189, 248, 0.3)',
+            padding: '12px 16px',
+            borderRadius: 12,
+            background: isDark ? 'rgba(56, 189, 248, 0.12)' : 'rgba(56, 189, 248, 0.08)',
+            border: `1px solid ${isDark ? 'rgba(56, 189, 248, 0.3)' : 'rgba(56, 189, 248, 0.25)'}`,
           }}
         >
           <div>
-            <div style={{ fontWeight: 700, fontSize: 14, color: '#7DD3FC' }}>Contador Asignado</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Base {pctContador}% de la tarifa</div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: isDark ? '#7DD3FC' : '#0369A1' }}>Contador Asignado</div>
+            <div style={{ fontSize: 11, color: subtextColor }}>Base {pctContador}% de la tarifa</div>
           </div>
-          <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace', color: '#38BDF8' }}>
+          <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace', color: isDark ? '#38BDF8' : '#0284C7' }}>
             {formatCOP(amtContador)}
           </span>
         </div>
 
+        {/* Referido */}
         {hasRef && (
           <div
             style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              padding: '10px 14px',
-              borderRadius: 10,
-              background: 'rgba(78, 214, 161, 0.1)',
-              border: '1px solid rgba(78, 214, 161, 0.25)',
+              padding: '12px 16px',
+              borderRadius: 12,
+              background: isDark ? 'rgba(78, 214, 161, 0.1)' : 'rgba(78, 214, 161, 0.08)',
+              border: `1px solid ${isDark ? 'rgba(78, 214, 161, 0.25)' : 'rgba(78, 214, 161, 0.25)'}`,
             }}
           >
             <div>
-              <div style={{ fontWeight: 700, fontSize: 14, color: '#4ED6A1' }}>Referido</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Comisión {pctRefAmt}% por traer el cliente</div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: isDark ? '#4ED6A1' : '#15803D' }}>Referido</div>
+              <div style={{ fontSize: 11, color: subtextColor }}>Comisión {pctRefAmt}% por traer el cliente</div>
             </div>
-            <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace', color: '#4ED6A1' }}>
+            <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace', color: isDark ? '#4ED6A1' : '#16A34A' }}>
               {formatCOP(amtReferido)}
             </span>
           </div>
         )}
 
+        {/* Vendedor */}
         {hasVend && (
           <div
             style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              padding: '10px 14px',
-              borderRadius: 10,
-              background: 'rgba(251, 191, 36, 0.1)',
-              border: '1px solid rgba(251, 191, 36, 0.25)',
+              padding: '12px 16px',
+              borderRadius: 12,
+              background: isDark ? 'rgba(251, 191, 36, 0.1)' : 'rgba(251, 191, 36, 0.08)',
+              border: `1px solid ${isDark ? 'rgba(251, 191, 36, 0.25)' : 'rgba(251, 191, 36, 0.25)'}`,
             }}
           >
             <div>
-              <div style={{ fontWeight: 700, fontSize: 14, color: '#FBBF24' }}>Vendedor</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Comisión 10% por venta manual/atención</div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: isDark ? '#FBBF24' : '#B45309' }}>Vendedor</div>
+              <div style={{ fontSize: 11, color: subtextColor }}>Comisión 10% por atención / venta</div>
             </div>
-            <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace', color: '#FBBF24' }}>
+            <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace', color: isDark ? '#FBBF24' : '#D97706' }}>
               {formatCOP(amtVendedor)}
             </span>
           </div>
         )}
 
+        {/* Desarrollo */}
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            padding: '10px 14px',
-            borderRadius: 10,
-            background: 'rgba(168, 85, 247, 0.1)',
-            border: '1px solid rgba(168, 85, 247, 0.25)',
+            padding: '12px 16px',
+            borderRadius: 12,
+            background: isDark ? 'rgba(168, 85, 247, 0.1)' : 'rgba(168, 85, 247, 0.08)',
+            border: `1px solid ${isDark ? 'rgba(168, 85, 247, 0.25)' : 'rgba(168, 85, 247, 0.25)'}`,
           }}
         >
           <div>
-            <div style={{ fontWeight: 700, fontSize: 14, color: '#C084FC' }}>Desarrollo &amp; Soporte</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Fijo 5% por mantenimiento</div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: isDark ? '#C084FC' : '#7E22CE' }}>Desarrollo &amp; Soporte</div>
+            <div style={{ fontSize: 11, color: subtextColor }}>Fijo 5% por mantenimiento</div>
           </div>
-          <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace', color: '#C084FC' }}>
+          <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace', color: isDark ? '#C084FC' : '#9333EA' }}>
             {formatCOP(amtDesarrollo)}
           </span>
         </div>
 
+        {/* Plataforma */}
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            padding: '10px 14px',
-            borderRadius: 10,
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
+            padding: '12px 16px',
+            borderRadius: 12,
+            background: isDark ? 'rgba(255, 255, 255, 0.05)' : '#F8FAFC',
+            border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0'}`,
           }}
         >
           <div>
-            <div style={{ fontWeight: 700, fontSize: 14, color: '#CBD5E1' }}>Plataforma (Utilidad)</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Remanente neto plataforma</div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: isDark ? '#CBD5E1' : '#334155' }}>Plataforma (Utilidad)</div>
+            <div style={{ fontSize: 11, color: subtextColor }}>Remanente neto plataforma</div>
           </div>
-          <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace', color: '#F1F5F9' }}>
+          <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace', color: isDark ? '#F1F5F9' : '#0F172A' }}>
             {formatCOP(amtPlataforma)}
           </span>
         </div>

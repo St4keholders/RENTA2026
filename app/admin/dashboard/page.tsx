@@ -107,7 +107,7 @@ export default function AdminDashboardPage() {
 
   /* Auth & Tabs */
   const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
-  const [activeTab, setActiveTab] = useState<'crm' | 'leads' | 'usuarios' | 'ventas' | 'links' | 'calculadora' | 'comisiones'>('crm');
+  const [activeTab, setActiveTab] = useState<'crm' | 'leads' | 'usuarios' | 'ventas' | 'links' | 'calculadora'>('crm');
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
   /* Global Loading Indicator */
@@ -233,24 +233,19 @@ export default function AdminDashboardPage() {
     setLoadingText(msg);
     setGlobalLoading(true);
     try {
-      const [resLeads, resUsuarios] = await Promise.all([
+      const [resLeads, resUsuarios, resVentas] = await Promise.all([
         fetch('/api/admin/leads'),
         fetch('/api/admin/usuarios'),
+        fetch('/api/admin/ventas'),
       ]);
 
       const dataLeads = await resLeads.json();
       const dataUsuarios = await resUsuarios.json();
+      const dataVentas = await resVentas.json();
 
       if (dataLeads.leads) setLeads(dataLeads.leads);
       if (dataUsuarios.usuarios) setUsuarios(dataUsuarios.usuarios);
-
-      if (isDevOrAdmin) {
-        const resVentas = await fetch('/api/admin/ventas');
-        const dataVentas = await resVentas.json();
-        if (!dataVentas.error) {
-          setReporteVentas(dataVentas);
-        }
-      }
+      if (!dataVentas.error) setReporteVentas(dataVentas);
     } catch (error) {
       console.error('Error cargando información:', error);
     } finally {
@@ -323,7 +318,7 @@ export default function AdminDashboardPage() {
   };
 
   const handleRemoveFromCRM = async (leadId: string) => {
-    if (!confirm('¿Seguro que deseas eliminar este cliente del CRM?')) return;
+    if (!confirm('¿Seguro que deseas eliminar este cliente?')) return;
     setLoadingText('Eliminando cliente...');
     setGlobalLoading(true);
     try {
@@ -446,6 +441,24 @@ export default function AdminDashboardPage() {
     return true;
   });
 
+  /* Personal Sales & Commissions filtering for non-admins */
+  const misVentasDetalle = (reporteVentas?.ventas || []).filter((v) => {
+    if (isDevOrAdmin) return true;
+    const lead = leads.find((l) => l.id === v.id);
+    if (isContador) return lead?.contador_id === currentUser?.id;
+    if (isVendedor) return lead?.seller_id === currentUser?.id || lead?.referrer_id === currentUser?.id;
+    if (isReferido) return lead?.referrer_id === currentUser?.id;
+    return false;
+  });
+
+  const miComisionTotalCalculada = misVentasDetalle.reduce((sum, v) => {
+    const lead = leads.find((l) => l.id === v.id);
+    if (isContador || lead?.contador_id === currentUser?.id) return sum + v.amtContador;
+    if (lead?.seller_id === currentUser?.id) return sum + v.amtVendedor;
+    if (lead?.referrer_id === currentUser?.id) return sum + v.amtReferido;
+    return sum + (isDevOrAdmin ? v.amtPlataforma : 0);
+  }, 0);
+
   /* Calculate user referral links */
   const userSlug = currentUser?.referral_slug || currentUser?.nombre?.toLowerCase().replace(/[^a-z0-9]/g, '') || currentUser?.id.substring(0, 6);
   const testLink = typeof window !== 'undefined' ? `${window.location.origin}/test?ref=${userSlug}` : `https://rentash.vercel.app/test?ref=${userSlug}`;
@@ -479,16 +492,16 @@ export default function AdminDashboardPage() {
   const renderMedioContacto = (lead: LeadData) => {
     const medio = lead.ventas?.[0]?.medio_contacto;
     if (!medio) return <span style={{ fontSize: 11, color: t.subtext }}>Sin especificar</span>;
-    if (medio === 'videollamada') return <span style={{ fontSize: 11, color: '#7DD3FC', fontWeight: 600 }}>📹 Videollamada</span>;
-    if (medio === 'whatsapp') return <span style={{ fontSize: 11, color: '#4ED6A1', fontWeight: 600 }}>💬 WhatsApp</span>;
-    return <span style={{ fontSize: 11, color: '#FBBF24', fontWeight: 600 }}>📞 Llamada</span>;
+    if (medio === 'videollamada') return <span style={{ fontSize: 11, color: '#7DD3FC', fontWeight: 600 }}>Videollamada</span>;
+    if (medio === 'whatsapp') return <span style={{ fontSize: 11, color: '#4ED6A1', fontWeight: 600 }}>WhatsApp</span>;
+    return <span style={{ fontSize: 11, color: '#FBBF24', fontWeight: 600 }}>Llamada</span>;
   };
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: t.bg, color: t.text, position: 'relative', overflowX: 'hidden' }}>
       <canvas ref={canvasRef} style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0 }} />
 
-      {/* ── Global Loading Indicator (Punto 12) ── */}
+      {/* ── Global Loading Indicator ── */}
       {globalLoading && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, height: 4, zIndex: 9999,
@@ -556,24 +569,22 @@ export default function AdminDashboardPage() {
               </span>
             </button>
 
-            {/* 2. REPORTE DE VENTAS & FINANZAS (Solo Admins) */}
-            {isDevOrAdmin && (
-              <button
-                onClick={() => { setActiveTab('ventas'); setMobileMenuOpen(false); }}
-                style={{
-                  width: '100%', padding: '12px 14px', borderRadius: 12, textAlign: 'left',
-                  fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', transition: 'all .2s',
-                  background: activeTab === 'ventas' ? 'rgba(61,107,255,0.18)' : 'transparent',
-                  border: activeTab === 'ventas' ? '1px solid rgba(61,107,255,0.5)' : '1px solid transparent',
-                  color: activeTab === 'ventas' ? t.text : t.subtext,
-                }}
-              >
-                VENTAS &amp; FINANZAS
-              </button>
-            )}
+            {/* 2. REPORTE DE VENTAS & FINANZAS (Para Todos los Roles) */}
+            <button
+              onClick={() => { setActiveTab('ventas'); setMobileMenuOpen(false); }}
+              style={{
+                width: '100%', padding: '12px 14px', borderRadius: 12, textAlign: 'left',
+                fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', transition: 'all .2s',
+                background: activeTab === 'ventas' ? 'rgba(61,107,255,0.18)' : 'transparent',
+                border: activeTab === 'ventas' ? '1px solid rgba(61,107,255,0.5)' : '1px solid transparent',
+                color: activeTab === 'ventas' ? t.text : t.subtext,
+              }}
+            >
+              VENTAS &amp; FINANZAS
+            </button>
 
-            {/* 3. MIS LINKS DE REFERIDO (Para Referidos, Vendedores y Admins) */}
+            {/* 3. MIS LINKS DE REFERIDO */}
             {(isReferido || isVendedor || isDevOrAdmin) && (
               <button
                 onClick={() => { setActiveTab('links'); setMobileMenuOpen(false); }}
@@ -586,7 +597,7 @@ export default function AdminDashboardPage() {
                   color: activeTab === 'links' ? t.text : t.subtext,
                 }}
               >
-                LINKS DE REFERIDO 🔗
+                LINKS DE REFERIDO
               </button>
             )}
 
@@ -602,7 +613,7 @@ export default function AdminDashboardPage() {
                 color: activeTab === 'calculadora' ? t.text : t.subtext,
               }}
             >
-              CALCULADORA 🧮
+              CALCULADORA
             </button>
 
             {/* 5. USUARIOS (Solo Admin) */}
@@ -625,8 +636,8 @@ export default function AdminDashboardPage() {
               </button>
             )}
 
-            {/* 6. LEADS (ÚLTIMO TAB — Solo Admin) */}
-            {isDevOrAdmin && (
+            {/* 6. TODOS LOS LEADS (Admins + Contadores) */}
+            {(isDevOrAdmin || isContador) && (
               <button
                 onClick={() => { setActiveTab('leads'); setMobileMenuOpen(false); }}
                 style={{
@@ -689,7 +700,7 @@ export default function AdminDashboardPage() {
             </span>
             <h1 style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 'clamp(1.5rem,4vw,2.2rem)', margin: 0, letterSpacing: '-.04em', color: t.text }}>
               {activeTab === 'crm' && 'CRM — Clientes Pagados'}
-              {activeTab === 'ventas' && 'Reporte de Ventas & Finanzas'}
+              {activeTab === 'ventas' && (isDevOrAdmin ? 'Reporte de Ventas & Finanzas' : 'Mis Ventas & Comisiones')}
               {activeTab === 'links' && 'Mis Links de Referidos'}
               {activeTab === 'calculadora' && 'Calculadora de Comisiones'}
               {activeTab === 'leads' && 'Todos los Leads Registrados'}
@@ -969,40 +980,60 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
-        {/* ── TAB 2: REPORTE DE VENTAS & FINANZAS (SOLO ADMINS) ── */}
-        {activeTab === 'ventas' && isDevOrAdmin && reporteVentas && (
+        {/* ── TAB 2: REPORTE DE VENTAS & FINANZAS ── */}
+        {activeTab === 'ventas' && reporteVentas && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
             {/* Tarjetas de Resumen Financiero */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
-              <div style={{ background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20 }}>
-                <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: t.subtext, textTransform: 'uppercase' }}>Ventas Brutas Totales</span>
-                <div style={{ fontSize: 24, fontWeight: 800, color: '#38BDF8', fontFamily: 'monospace', marginTop: 6 }}>
-                  {formatCOP(reporteVentas.resumen.totalVentasBrutas)}
+            {isDevOrAdmin ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+                <div style={{ background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20 }}>
+                  <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: t.subtext, textTransform: 'uppercase' }}>Ventas Brutas Totales</span>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: '#38BDF8', fontFamily: 'monospace', marginTop: 6 }}>
+                    {formatCOP(reporteVentas.resumen.totalVentasBrutas)}
+                  </div>
+                  <span style={{ fontSize: 11, color: t.subtext }}>Declaraciones + Consultorías</span>
                 </div>
-                <span style={{ fontSize: 11, color: t.subtext }}>Declaraciones + Consultorías</span>
-              </div>
 
-              <div style={{ background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20 }}>
-                <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: t.subtext, textTransform: 'uppercase' }}>Costos Comisiones Totales</span>
-                <div style={{ fontSize: 24, fontWeight: 800, color: '#FBBF24', fontFamily: 'monospace', marginTop: 6 }}>
-                  {formatCOP(reporteVentas.resumen.totalCostosComisiones)}
+                <div style={{ background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20 }}>
+                  <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: t.subtext, textTransform: 'uppercase' }}>Costos Comisiones Totales</span>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: '#FBBF24', fontFamily: 'monospace', marginTop: 6 }}>
+                    {formatCOP(reporteVentas.resumen.totalCostosComisiones)}
+                  </div>
+                  <span style={{ fontSize: 11, color: t.subtext }}>Contadores + Vend + Ref + Dev</span>
                 </div>
-                <span style={{ fontSize: 11, color: t.subtext }}>Contadores + Vend + Ref + Dev</span>
-              </div>
 
-              <div style={{ background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20 }}>
-                <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: t.subtext, textTransform: 'uppercase' }}>Utilidad Neta Plataforma</span>
-                <div style={{ fontSize: 24, fontWeight: 800, color: '#4ED6A1', fontFamily: 'monospace', marginTop: 6 }}>
-                  {formatCOP(reporteVentas.resumen.totalUtilidadPlataforma)}
+                <div style={{ background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20 }}>
+                  <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: t.subtext, textTransform: 'uppercase' }}>Utilidad Neta Plataforma</span>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: '#4ED6A1', fontFamily: 'monospace', marginTop: 6 }}>
+                    {formatCOP(reporteVentas.resumen.totalUtilidadPlataforma)}
+                  </div>
+                  <span style={{ fontSize: 11, color: t.subtext }}>Ganancia limpia para la empresa</span>
                 </div>
-                <span style={{ fontSize: 11, color: t.subtext }}>Ganancia limpia para la empresa</span>
               </div>
-            </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+                <div style={{ background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20 }}>
+                  <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: t.subtext, textTransform: 'uppercase' }}>Mis Ventas Confirmadas</span>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: '#38BDF8', fontFamily: 'monospace', marginTop: 6 }}>
+                    {misVentasDetalle.length} Clientes
+                  </div>
+                  <span style={{ fontSize: 11, color: t.subtext }}>Declaraciones asignadas</span>
+                </div>
+
+                <div style={{ background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20 }}>
+                  <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: t.subtext, textTransform: 'uppercase' }}>Mi Comisión Acumulada</span>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: '#4ED6A1', fontFamily: 'monospace', marginTop: 6 }}>
+                    {formatCOP(miComisionTotalCalculada)}
+                  </div>
+                  <span style={{ fontSize: 11, color: t.subtext }}>Ganancia acumulada total</span>
+                </div>
+              </div>
+            )}
 
             {/* Tabla de Desglose por Cliente */}
             <div style={{ background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 20, overflow: 'hidden' }}>
               <div style={{ padding: '16px 20px', borderBottom: `1px solid ${t.border}`, fontWeight: 700 }}>
-                Desglose Financiero por Cliente Confirmado
+                {isDevOrAdmin ? 'Desglose Financiero por Cliente Confirmado' : 'Mis Clientes y Comisiones Asignadas'}
               </div>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
@@ -1010,25 +1041,53 @@ export default function AdminDashboardPage() {
                     <tr style={{ background: t.tableHeaderBg, borderBottom: `1px solid ${t.border}`, fontFamily: 'var(--mono)', textTransform: 'uppercase', color: t.tableHeaderColor }}>
                       <th style={{ padding: '12px 16px' }}>Cliente</th>
                       <th style={{ padding: '12px 16px' }}>Venta Total</th>
-                      <th style={{ padding: '12px 16px' }}>Comisión Contador</th>
-                      <th style={{ padding: '12px 16px' }}>Comisión Vendedor</th>
-                      <th style={{ padding: '12px 16px' }}>Comisión Referido</th>
-                      <th style={{ padding: '12px 16px' }}>Desarrollo (5%)</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'right' }}>Utilidad Plataforma</th>
+                      {isDevOrAdmin ? (
+                        <>
+                          <th style={{ padding: '12px 16px' }}>Comisión Contador</th>
+                          <th style={{ padding: '12px 16px' }}>Comisión Vendedor</th>
+                          <th style={{ padding: '12px 16px' }}>Comisión Referido</th>
+                          <th style={{ padding: '12px 16px' }}>Desarrollo (5%)</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'right' }}>Utilidad Plataforma</th>
+                        </>
+                      ) : (
+                        <>
+                          <th style={{ padding: '12px 16px' }}>Valor Declaración</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'right' }}>Mi Comisión Ganada</th>
+                        </>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
-                    {reporteVentas.ventas.map((v) => (
-                      <tr key={v.id} style={{ borderBottom: `1px solid ${t.tableRowBorder}` }}>
-                        <td style={{ padding: '12px 16px', fontWeight: 600 }}>{v.nombre}</td>
-                        <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#38BDF8' }}>{formatCOP(v.totalVentaCliente)}</td>
-                        <td style={{ padding: '12px 16px', fontFamily: 'monospace' }}>{formatCOP(v.amtContador)} ({v.contadorNombre})</td>
-                        <td style={{ padding: '12px 16px', fontFamily: 'monospace' }}>{formatCOP(v.amtVendedor)} ({v.vendedorNombre})</td>
-                        <td style={{ padding: '12px 16px', fontFamily: 'monospace' }}>{formatCOP(v.amtReferido)} ({v.referidoNombre})</td>
-                        <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#C084FC' }}>{formatCOP(v.amtDesarrollo)}</td>
-                        <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#4ED6A1', textAlign: 'right', fontWeight: 700 }}>{formatCOP(v.amtPlataforma)}</td>
-                      </tr>
-                    ))}
+                    {misVentasDetalle.map((v) => {
+                      const miAmt = isContador
+                        ? v.amtContador
+                        : isVendedor
+                        ? v.amtVendedor
+                        : isReferido
+                        ? v.amtReferido
+                        : v.amtContador;
+
+                      return (
+                        <tr key={v.id} style={{ borderBottom: `1px solid ${t.tableRowBorder}` }}>
+                          <td style={{ padding: '12px 16px', fontWeight: 600 }}>{v.nombre}</td>
+                          <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#38BDF8' }}>{formatCOP(v.totalVentaCliente)}</td>
+                          {isDevOrAdmin ? (
+                            <>
+                              <td style={{ padding: '12px 16px', fontFamily: 'monospace' }}>{formatCOP(v.amtContador)} ({v.contadorNombre})</td>
+                              <td style={{ padding: '12px 16px', fontFamily: 'monospace' }}>{formatCOP(v.amtVendedor)} ({v.vendedorNombre})</td>
+                              <td style={{ padding: '12px 16px', fontFamily: 'monospace' }}>{formatCOP(v.amtReferido)} ({v.referidoNombre})</td>
+                              <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#C084FC' }}>{formatCOP(v.amtDesarrollo)}</td>
+                              <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#4ED6A1', textAlign: 'right', fontWeight: 700 }}>{formatCOP(v.amtPlataforma)}</td>
+                            </>
+                          ) : (
+                            <>
+                              <td style={{ padding: '12px 16px', fontFamily: 'monospace' }}>{formatCOP(v.valorDeclaracion)}</td>
+                              <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#4ED6A1', textAlign: 'right', fontWeight: 700 }}>{formatCOP(miAmt)}</td>
+                            </>
+                          )}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1064,7 +1123,7 @@ export default function AdminDashboardPage() {
                     color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer',
                   }}
                 >
-                  {copiedLinkText === 'test' ? '¡Copiado! ✓' : 'Copiar Link 📋'}
+                  {copiedLinkText === 'test' ? '¡Copiado! ✓' : 'Copiar Link'}
                 </button>
               </div>
             </div>
@@ -1094,7 +1153,7 @@ export default function AdminDashboardPage() {
                     color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer',
                   }}
                 >
-                  {copiedLinkText === 'agendar' ? '¡Copiado! ✓' : 'Copiar Link 📋'}
+                  {copiedLinkText === 'agendar' ? '¡Copiado! ✓' : 'Copiar Link'}
                 </button>
               </div>
             </div>
@@ -1102,10 +1161,10 @@ export default function AdminDashboardPage() {
         )}
 
         {/* ── TAB 4: CALCULADORA DE COMISIONES ── */}
-        {activeTab === 'calculadora' && <CalculadoraComisiones />}
+        {activeTab === 'calculadora' && <CalculadoraComisiones isDark={isDark} />}
 
-        {/* ── TAB 5: LEADS (ÚLTIMO TAB — SOLO ADMINS) ── */}
-        {activeTab === 'leads' && isDevOrAdmin && (
+        {/* ── TAB 5: LEADS (ADMINS Y CONTADORES) ── */}
+        {activeTab === 'leads' && (isDevOrAdmin || isContador) && (
           <div style={{
             background: t.cardBg, backdropFilter: 'blur(20px)',
             border: `1px solid ${t.border}`, borderRadius: 20,
@@ -1143,21 +1202,32 @@ export default function AdminDashboardPage() {
                         <span style={{ color: isDark ? '#7DD3FC' : '#0284C7', fontWeight: 600 }}>{lead.arquetipos?.nombre || 'General'}</span>
                       </td>
 
-                      {/* Estado de Pago (Editable) */}
+                      {/* Estado de Pago */}
                       <td style={{ padding: '16px 18px' }}>
-                        <select
-                          value={lead.pagado ? 'true' : 'false'}
-                          onChange={(e) => handleUpdatePagadoLead(lead.id, e.target.value === 'true')}
-                          style={{
+                        {isDevOrAdmin ? (
+                          <select
+                            value={lead.pagado ? 'true' : 'false'}
+                            onChange={(e) => handleUpdatePagadoLead(lead.id, e.target.value === 'true')}
+                            style={{
+                              background: lead.pagado ? 'rgba(78,214,161,0.18)' : 'rgba(255,80,80,0.12)',
+                              border: lead.pagado ? '1px solid rgba(78,214,161,0.5)' : '1px solid rgba(255,80,80,0.3)',
+                              borderRadius: 8, color: lead.pagado ? (isDark ? '#4ED6A1' : '#16A34A') : '#FF8080',
+                              padding: '6px 10px', fontSize: 11, fontFamily: 'var(--mono)', fontWeight: 700, outline: 'none',
+                            }}
+                          >
+                            <option value="false" style={{ background: t.modalBg, color: t.text }}>❌ No Pagado</option>
+                            <option value="true" style={{ background: t.modalBg, color: t.text }}>✅ PAGADO (Pasa a CRM)</option>
+                          </select>
+                        ) : (
+                          <span style={{
+                            padding: '4px 10px', borderRadius: 8,
                             background: lead.pagado ? 'rgba(78,214,161,0.18)' : 'rgba(255,80,80,0.12)',
-                            border: lead.pagado ? '1px solid rgba(78,214,161,0.5)' : '1px solid rgba(255,80,80,0.3)',
-                            borderRadius: 8, color: lead.pagado ? (isDark ? '#4ED6A1' : '#16A34A') : '#FF8080',
-                            padding: '6px 10px', fontSize: 11, fontFamily: 'var(--mono)', fontWeight: 700, outline: 'none',
-                          }}
-                        >
-                          <option value="false" style={{ background: t.modalBg, color: t.text }}>❌ No Pagado</option>
-                          <option value="true" style={{ background: t.modalBg, color: t.text }}>✅ PAGADO (Pasa a CRM)</option>
-                        </select>
+                            color: lead.pagado ? (isDark ? '#4ED6A1' : '#16A34A') : '#FF8080',
+                            fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 700,
+                          }}>
+                            {lead.pagado ? 'PAGADO' : 'No Pagado'}
+                          </span>
+                        )}
                       </td>
 
                       {/* Etapa */}
@@ -1167,35 +1237,81 @@ export default function AdminDashboardPage() {
 
                       {/* Asignar Contador */}
                       <td style={{ padding: '16px 18px' }}>
-                        <select
-                          value={lead.contador_id || ''}
-                          onChange={(e) => handleUpdateAssignment(lead.id, 'contador_id', e.target.value || null)}
-                          style={{
-                            background: lead.contador_id ? 'rgba(61,107,255,0.18)' : t.inputBg,
-                            border: lead.contador_id ? '1px solid rgba(61,107,255,0.5)' : `1px solid ${t.inputBorder}`,
-                            borderRadius: 8, color: t.inputColor, padding: '4px 8px', fontSize: 11, fontFamily: 'var(--body)', outline: 'none',
-                          }}
-                        >
-                          <option value="" style={{ background: t.modalBg, color: t.text }}>Sin asignar</option>
-                          {usuarios.map((u) => (
-                            <option key={u.id} value={u.id} style={{ background: t.modalBg, color: t.text }}>
-                              {u.nombre} ({u.rol})
-                            </option>
-                          ))}
-                        </select>
+                        {isDevOrAdmin ? (
+                          <select
+                            value={lead.contador_id || ''}
+                            onChange={(e) => handleUpdateAssignment(lead.id, 'contador_id', e.target.value || null)}
+                            style={{
+                              background: lead.contador_id ? 'rgba(61,107,255,0.18)' : t.inputBg,
+                              border: lead.contador_id ? '1px solid rgba(61,107,255,0.5)' : `1px solid ${t.inputBorder}`,
+                              borderRadius: 8, color: t.inputColor, padding: '4px 8px', fontSize: 11, fontFamily: 'var(--body)', outline: 'none',
+                            }}
+                          >
+                            <option value="" style={{ background: t.modalBg, color: t.text }}>Sin asignar</option>
+                            {usuarios.map((u) => (
+                              <option key={u.id} value={u.id} style={{ background: t.modalBg, color: t.text }}>
+                                {u.nombre} ({u.rol})
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span style={{ fontSize: 11, color: t.subtext }}>{lead.contador?.nombre || 'Sin asignar'}</span>
+                        )}
                       </td>
 
                       <td style={{ padding: '16px 18px', textAlign: 'right' }}>
-                        <button
-                          onClick={() => handleRemoveFromCRM(lead.id)}
-                          style={{
-                            padding: '5px 10px', borderRadius: 8, background: 'rgba(255,80,80,0.14)',
-                            border: '1px solid rgba(255,80,80,0.3)', color: '#FF8080',
-                            fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer',
-                          }}
-                        >
-                          Eliminar
-                        </button>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap', alignItems: 'center' }}>
+                          <Link
+                            href={`/r/${lead.slug_publico}`}
+                            target="_blank"
+                            style={{
+                              padding: '5px 10px', borderRadius: 8, background: 'rgba(61,107,255,0.12)',
+                              border: '1px solid rgba(61,107,255,0.3)', color: isDark ? '#7DD3FC' : '#0284C7',
+                              fontFamily: 'var(--mono)', fontSize: 11, textDecoration: 'none',
+                            }}
+                          >
+                            Resultado ↗
+                          </Link>
+
+                          <button
+                            onClick={() => setSelectedRespuestasLead(lead)}
+                            style={{
+                              padding: '5px 10px', borderRadius: 8, background: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0',
+                              border: `1px solid ${t.inputBorder}`, color: t.text,
+                              fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer',
+                            }}
+                          >
+                            Finanzas
+                          </button>
+
+                          {isDevOrAdmin && (
+                            <>
+                              <button
+                                onClick={() => handleOpenEditLead(lead)}
+                                style={{
+                                  padding: '5px 10px', borderRadius: 8, background: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0',
+                                  border: `1px solid ${t.inputBorder}`, color: t.text,
+                                  fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer',
+                                }}
+                              >
+                                Editar
+                              </button>
+
+                              <button
+                                onClick={() => handleRemoveFromCRM(lead.id)}
+                                title="Eliminar Lead"
+                                style={{
+                                  padding: '5px 10px', borderRadius: 8, background: 'rgba(255,80,80,0.14)',
+                                  border: '1px solid rgba(255,80,80,0.3)', color: '#FF8080',
+                                  fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer',
+                                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                                }}
+                              >
+                                <TrashIcon />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1366,22 +1482,57 @@ export default function AdminDashboardPage() {
               <button onClick={() => setSelectedRespuestasLead(null)} style={{ background: 'none', border: 'none', color: t.text, fontSize: 20, cursor: 'pointer' }}>✕</button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ padding: 12, borderRadius: 10, background: isDark ? 'rgba(255,255,255,0.04)' : '#F1F5F9' }}>
-                <span style={{ fontSize: 11, color: t.subtext, display: 'block' }}>Patrimonio Bruto</span>
-                <strong style={{ fontSize: 16, color: '#F0B93C' }}>{selectedRespuestasLead.barra_patrimonio}/100</strong>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Indicadores de puntuación */}
+              <div>
+                <span style={{ fontSize: 11, fontFamily: 'var(--mono)', textTransform: 'uppercase', color: t.subtext, display: 'block', marginBottom: 8 }}>
+                  Puntuación de Barras de Arquetipo
+                </span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div style={{ padding: '10px 12px', borderRadius: 10, background: isDark ? 'rgba(255,255,255,0.04)' : '#F1F5F9' }}>
+                    <span style={{ fontSize: 10, color: t.subtext, display: 'block' }}>Patrimonio</span>
+                    <strong style={{ fontSize: 15, color: '#F0B93C' }}>{selectedRespuestasLead.barra_patrimonio}/100</strong>
+                  </div>
+                  <div style={{ padding: '10px 12px', borderRadius: 10, background: isDark ? 'rgba(255,255,255,0.04)' : '#F1F5F9' }}>
+                    <span style={{ fontSize: 10, color: t.subtext, display: 'block' }}>Ingresos</span>
+                    <strong style={{ fontSize: 15, color: '#4ED6A1' }}>{selectedRespuestasLead.barra_ingresos}/100</strong>
+                  </div>
+                  <div style={{ padding: '10px 12px', borderRadius: 10, background: isDark ? 'rgba(255,255,255,0.04)' : '#F1F5F9' }}>
+                    <span style={{ fontSize: 10, color: t.subtext, display: 'block' }}>Créditos</span>
+                    <strong style={{ fontSize: 15, color: '#FF6B8A' }}>{selectedRespuestasLead.barra_creditos}/100</strong>
+                  </div>
+                  <div style={{ padding: '10px 12px', borderRadius: 10, background: isDark ? 'rgba(255,255,255,0.04)' : '#F1F5F9' }}>
+                    <span style={{ fontSize: 10, color: t.subtext, display: 'block' }}>Movimientos</span>
+                    <strong style={{ fontSize: 15, color: '#7DD3FC' }}>{selectedRespuestasLead.barra_movimientos}/100</strong>
+                  </div>
+                </div>
               </div>
-              <div style={{ padding: 12, borderRadius: 10, background: isDark ? 'rgba(255,255,255,0.04)' : '#F1F5F9' }}>
-                <span style={{ fontSize: 11, color: t.subtext, display: 'block' }}>Ingresos Brutos</span>
-                <strong style={{ fontSize: 16, color: '#4ED6A1' }}>{selectedRespuestasLead.barra_ingresos}/100</strong>
-              </div>
-              <div style={{ padding: 12, borderRadius: 10, background: isDark ? 'rgba(255,255,255,0.04)' : '#F1F5F9' }}>
-                <span style={{ fontSize: 11, color: t.subtext, display: 'block' }}>Consumos Tarjetas / Créditos</span>
-                <strong style={{ fontSize: 16, color: '#FF6B8A' }}>{selectedRespuestasLead.barra_creditos}/100</strong>
-              </div>
-              <div style={{ padding: 12, borderRadius: 10, background: isDark ? 'rgba(255,255,255,0.04)' : '#F1F5F9' }}>
-                <span style={{ fontSize: 11, color: t.subtext, display: 'block' }}>Consignaciones / Movimientos Bancarios</span>
-                <strong style={{ fontSize: 16, color: '#7DD3FC' }}>{selectedRespuestasLead.barra_movimientos}/100</strong>
+
+              {/* Respuestas detalladas del cuestionario */}
+              <div>
+                <span style={{ fontSize: 11, fontFamily: 'var(--mono)', textTransform: 'uppercase', color: '#3D6BFF', display: 'block', marginBottom: 8 }}>
+                  Respuestas Detalladas del Test Tributario
+                </span>
+                {selectedRespuestasLead.respuestas?.[0]?.payload ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
+                    {Object.entries(selectedRespuestasLead.respuestas[0].payload).map(([key, val]) => (
+                      <div key={key} style={{ padding: '10px 14px', borderRadius: 10, background: isDark ? 'rgba(255,255,255,0.04)' : '#F1F5F9', border: `1px solid ${t.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: t.subtext, textTransform: 'uppercase' }}>
+                          {key.replace(/_/g, ' ')}
+                        </span>
+                        <span style={{ fontWeight: 600, color: t.text, textAlign: 'right' }}>
+                          {typeof val === 'number' && (key.toLowerCase().includes('ingreso') || key.toLowerCase().includes('deuda') || key.toLowerCase().includes('valor') || key.toLowerCase().includes('costo') || key.toLowerCase().includes('patrimonio') || key.toLowerCase().includes('monto'))
+                            ? formatCOP(val)
+                            : String(val)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ padding: 16, textAlign: 'center', color: t.subtext, fontSize: 12, borderRadius: 10, background: isDark ? 'rgba(255,255,255,0.02)' : '#F8FAFC' }}>
+                    No hay datos detallados de respuestas registrados en el payload para este cliente.
+                  </div>
+                )}
               </div>
             </div>
 
