@@ -36,6 +36,8 @@ export default async function ResultPage({ params }: PageProps) {
       id,
       slug_publico,
       nombre,
+      celular,
+      correo,
       debe_declarar,
       topes_superados,
       barra_patrimonio,

@@ -16,6 +16,11 @@ const FADE_STYLE = `
 `;
 import '@/app/stakeholders.css';
 
+const MESES_NOMBRES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
+
 /* ── Types ──────────────────────────────────────────────────────────── */
 interface Arquetipo {
   slug: string;
@@ -30,6 +35,8 @@ interface LeadData {
   id: string;
   slug_publico: string;
   nombre: string;
+  celular?: string;
+  correo?: string;
   debe_declarar: boolean;
   topes_superados: string[];
   barra_patrimonio: number;
@@ -46,7 +53,7 @@ const SLUG_IDX: Record<string, number> = {
   malabarista: 3, mochilero: 4, sonador: 5,
 };
 
-/* ── StatBar: bar fill using div, avoids .bar span b scaleX(0) from stakeholders.css ── */
+/* ── StatBar: bar fill using div ────────────────────────────────────── */
 function StatBar({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 44px', alignItems: 'center', gap: 10 }}>
@@ -75,7 +82,6 @@ function IntroOverlay({
     setTimeout(() => { setHidden(true); onEnd(); }, 700);
   };
 
-  // Auto-skip when parent signals done (video ended from onEnded)
   useEffect(() => { if (done && !fading) skip(); }, [done]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (hidden) return null;
@@ -99,7 +105,6 @@ function IntroOverlay({
           onEnded={skip}
           onError={onError}
         />
-        {/* Skip button — bottom right */}
         <button
           onClick={skip}
           style={{
@@ -130,6 +135,23 @@ export default function ResultClientView({ lead }: { lead: LeadData }) {
   const [modalPlaying, setModalPlaying] = useState(false);
   const [modalReversed, setModalReversed] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  /* Agendar Modal state */
+  const [agendarOpen, setAgendarOpen] = useState(false);
+  const [agNombre, setAgNombre] = useState('');
+  const [agCorreo, setAgCorreo] = useState('');
+  const [agTel, setAgTel] = useState('');
+  const [agMedio, setAgMedio] = useState<'llamada' | 'videollamada' | 'whatsapp'>('llamada');
+  const [agDateSelected, setAgDateSelected] = useState<Date | null>(null);
+  const [agHoraSelected, setAgHoraSelected] = useState('');
+  const [calViewDate, setCalViewDate] = useState<Date>(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+  const [agSubmitting, setAgSubmitting] = useState(false);
+  const [agErr, setAgErr] = useState('');
+  const [agDoneTxt, setAgDoneTxt] = useState('');
 
   const arquetipo = lead.arquetipos;
   const arqData = ARCHETYPES[SLUG_IDX[arquetipo?.slug ?? ''] ?? 5];
@@ -181,7 +203,7 @@ export default function ResultClientView({ lead }: { lead: LeadData }) {
     return () => { document.body.style.backgroundColor = prev; };
   }, []);
 
-  /* Modal */
+  /* Modal Card */
   const handleOpenCard = () => {
     setModalReversed(false); setModalPlaying(false); setModalOpen(true);
     document.body.style.overflow = 'hidden';
@@ -208,6 +230,159 @@ export default function ResultClientView({ lead }: { lead: LeadData }) {
     setModalOpen(false); setModalPlaying(false); setModalReversed(false);
     document.body.style.overflow = '';
   };
+
+  /* Agendar Modal helpers */
+  const handleOpenAgendar = () => {
+    setAgNombre(lead.nombre || '');
+    setAgCorreo(lead.correo || '');
+    setAgTel(lead.celular || '');
+    setAgMedio('llamada');
+    setAgDateSelected(null);
+    setAgHoraSelected('');
+    setAgErr('');
+    setAgDoneTxt('');
+    setAgSubmitting(false);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    setCalViewDate(new Date(today.getFullYear(), today.getMonth(), 1));
+
+    setAgendarOpen(true);
+    document.body.style.overflow = 'hidden';
+  };
+
+  const handleCloseAgendar = () => {
+    setAgendarOpen(false);
+    document.body.style.overflow = '';
+  };
+
+  const getSlotsForDate = (date: Date) => {
+    const d = date.getDay();
+    if (d === 0) return [];
+    const end = d === 6 ? 14 : 18;
+    const out: string[] = [];
+    for (let h = 8; h < end; h++) {
+      out.push(`${String(h).padStart(2, '0')}:00`);
+      out.push(`${String(h).padStart(2, '0')}:30`);
+    }
+    return out;
+  };
+
+  const isDateAvailable = (date: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return date >= today && date.getDay() !== 0;
+  };
+
+  const handleSelectDate = (date: Date) => {
+    setAgDateSelected(date);
+    const slots = getSlotsForDate(date);
+    setAgHoraSelected(slots.length > 0 ? slots[0] : '');
+  };
+
+  const handleSubmitAgendar = async () => {
+    setAgErr('');
+    if (!agNombre.trim()) {
+      setAgErr('Escribe tu nombre.');
+      return;
+    }
+    if (!agDateSelected) {
+      setAgErr('Elige una fecha disponible para tu consulta.');
+      return;
+    }
+    if (agTel.replace(/\D/g, '').length < 7) {
+      setAgErr('Revisa tu número de contacto.');
+      return;
+    }
+
+    setAgSubmitting(true);
+
+    try {
+      const year = agDateSelected.getFullYear();
+      const month = String(agDateSelected.getMonth() + 1).padStart(2, '0');
+      const day = String(agDateSelected.getDate()).padStart(2, '0');
+      const formattedDateStr = `${year}-${month}-${day}`;
+      const fechaConsulta = `${formattedDateStr}T${agHoraSelected || '08:00'}:00Z`;
+
+      // 1. Guardar la cita
+      await fetch('/api/ventas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadSlug: lead.slug_publico,
+          fechaConsulta,
+          medioContacto: agMedio,
+        }),
+      });
+
+      setAgDoneTxt(`Gracias, ${agNombre.trim().split(' ')[0]}. Redirigiendo al pago de tu consultoría...`);
+
+      // 2. Redirigir a Wompi ($100.000 COP)
+      const checkoutRes = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lead_slug: lead.slug_publico,
+          customer_name: agNombre,
+          customer_email: agCorreo || undefined,
+          customer_phone: agTel,
+        }),
+      });
+
+      const dataCheckout = await checkoutRes.json();
+      if (dataCheckout.checkoutUrl) {
+        window.location.href = dataCheckout.checkoutUrl;
+        return;
+      }
+      throw new Error('No se pudo generar enlace de cobro');
+    } catch (err) {
+      console.error('Error agendando cita:', err);
+      setAgErr('Error de conexión. Por favor intenta de nuevo.');
+      setAgSubmitting(false);
+    }
+  };
+
+  const renderCalendarDays = () => {
+    const year = calViewDate.getFullYear();
+    const month = calViewDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const leadEmptyDays = (firstDay.getDay() + 6) % 7;
+    const totalDays = new Date(year, month + 1, 0).getDate();
+
+    const elements: React.ReactNode[] = [];
+
+    for (let i = 0; i < leadEmptyDays; i++) {
+      elements.push(<div key={`empty-${i}`} className="cal__day empty" />);
+    }
+
+    for (let d = 1; d <= totalDays; d++) {
+      const date = new Date(year, month, d);
+      const ok = isDateAvailable(date);
+      const isSelected = agDateSelected && date.getTime() === agDateSelected.getTime();
+
+      elements.push(
+        <button
+          key={`day-${d}`}
+          type="button"
+          disabled={!ok}
+          className={`cal__day ${ok ? 'on' : 'off'} ${isSelected ? 'sel' : ''}`}
+          onClick={() => ok && handleSelectDate(date)}
+        >
+          {d}
+        </button>
+      );
+    }
+
+    return elements;
+  };
+
+  const todayDate = new Date();
+  todayDate.setHours(0, 0, 0, 0);
+  const canPrevMonth =
+    calViewDate.getFullYear() > todayDate.getFullYear() ||
+    (calViewDate.getFullYear() === todayDate.getFullYear() && calViewDate.getMonth() > todayDate.getMonth());
+  const limitDate = new Date(todayDate.getFullYear(), todayDate.getMonth() + 3, 1);
+  const canNextMonth = calViewDate < limitDate;
 
   /* Share */
   const handleShare = async () => {
@@ -250,8 +425,6 @@ export default function ResultClientView({ lead }: { lead: LeadData }) {
       </header>
 
       <main style={{ position: 'relative', zIndex: 2, paddingTop: 88, paddingBottom: 72, maxWidth: 580, margin: '0 auto', padding: '88px 20px 72px' }}>
-
-        {/* space so content doesn't shift when overlay is present */}
 
         {/* ── Archetype card with glow ── */}
         <div
@@ -392,9 +565,9 @@ export default function ResultClientView({ lead }: { lead: LeadData }) {
           <p style={{ fontFamily: 'var(--mono)', fontSize: 11, color: '#3D6BFF', margin: '0 0 20px', letterSpacing: '.06em' }}>
             $100.000 COP · Abonables al servicio
           </p>
-          <Link href={`/agendar?lead=${lead.slug_publico}`} className="pill pill--blue">
+          <button onClick={handleOpenAgendar} className="pill pill--blue" type="button">
             Agendar Asesoría →
-          </Link>
+          </button>
         </div>
 
         {/* ── Footer links ── */}
@@ -419,7 +592,7 @@ export default function ResultClientView({ lead }: { lead: LeadData }) {
         />
       )}
 
-      {/* ── Modal (video + flip info) ── */}
+      {/* ── Modal Card (video + flip info) ── */}
       <div
         className={modalClasses}
         style={{ '--accent': arqData.accent, '--c2': arqData.c2 } as React.CSSProperties}
@@ -455,6 +628,174 @@ export default function ResultClientView({ lead }: { lead: LeadData }) {
             </div>
             <span className="verdict">{arqData.v}</span>
           </div>
+        </div>
+      </div>
+
+      {/* ── MODAL AGENDAR CONSULTA (POPUP DE RESULTADO) ── */}
+      <div
+        className={`sheet ${agendarOpen ? 'open' : ''}`}
+        id="agendar-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ag-title"
+      >
+        <div className="sheet__bg" onClick={handleCloseAgendar} />
+        <div className="sheet__card">
+          <button className="sheet__close" onClick={handleCloseAgendar} aria-label="Cerrar">
+            ✕
+          </button>
+
+          {!agDoneTxt ? (
+            <div className="sheet__body" id="ag-form">
+              <p className="sheet__eyebrow">Stakeholders</p>
+              <h3 id="ag-title">Agendar consulta</h3>
+              <p className="sheet__sub">Déjanos tus datos y elige un horario. Un contador del equipo confirma contigo.</p>
+
+              <label className="fld">
+                <span>Nombre completo</span>
+                <input
+                  id="ag-nombre"
+                  type="text"
+                  autoComplete="name"
+                  placeholder="Tu nombre"
+                  value={agNombre}
+                  onChange={(e) => setAgNombre(e.target.value)}
+                />
+              </label>
+
+              <label className="fld">
+                <span>Correo</span>
+                <input
+                  id="ag-correo"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="tucorreo@ejemplo.com"
+                  value={agCorreo}
+                  onChange={(e) => setAgCorreo(e.target.value)}
+                />
+              </label>
+
+              <label className="fld">
+                <span>Número de contacto</span>
+                <input
+                  id="ag-tel"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  placeholder="300 000 0000"
+                  value={agTel}
+                  onChange={(e) => setAgTel(e.target.value)}
+                />
+              </label>
+
+              <label className="fld">
+                <span>Método de contacto</span>
+                <select
+                  id="ag-medio"
+                  value={agMedio}
+                  onChange={(e) => setAgMedio(e.target.value as any)}
+                >
+                  <option value="llamada">Llamada</option>
+                  <option value="videollamada">Reunión virtual</option>
+                  <option value="whatsapp">WhatsApp</option>
+                </select>
+              </label>
+
+              <div className="fld">
+                <span>Fecha de la consulta</span>
+                <div className="cal" id="ag-cal">
+                  <div className="cal__nav">
+                    <button
+                      className="cal__arrow"
+                      id="cal-prev"
+                      aria-label="Mes anterior"
+                      type="button"
+                      disabled={!canPrevMonth}
+                      onClick={() =>
+                        setCalViewDate(new Date(calViewDate.getFullYear(), calViewDate.getMonth() - 1, 1))
+                      }
+                    >
+                      ‹
+                    </button>
+                    <p className="cal__month" id="cal-month">
+                      {MESES_NOMBRES[calViewDate.getMonth()]} {calViewDate.getFullYear()}
+                    </p>
+                    <button
+                      className="cal__arrow"
+                      id="cal-next"
+                      aria-label="Mes siguiente"
+                      type="button"
+                      disabled={!canNextMonth}
+                      onClick={() =>
+                        setCalViewDate(new Date(calViewDate.getFullYear(), calViewDate.getMonth() + 1, 1))
+                      }
+                    >
+                      ›
+                    </button>
+                  </div>
+                  <div className="cal__dow">
+                    <span>L</span>
+                    <span>M</span>
+                    <span>M</span>
+                    <span>J</span>
+                    <span>V</span>
+                    <span>S</span>
+                    <span>D</span>
+                  </div>
+                  <div className="cal__grid" id="cal-grid">
+                    {renderCalendarDays()}
+                  </div>
+                  <p className="cal__legend">Lun a vie 8:00–18:00 · Sáb 8:00–14:00 · Domingos cerrado</p>
+                </div>
+              </div>
+
+              {agDateSelected && getSlotsForDate(agDateSelected).length > 0 && (
+                <label className="fld" id="ag-hora-wrap">
+                  <span>Hora</span>
+                  <select
+                    id="ag-hora"
+                    value={agHoraSelected}
+                    onChange={(e) => setAgHoraSelected(e.target.value)}
+                  >
+                    {getSlotsForDate(agDateSelected).map((h) => (
+                      <option key={h} value={h}>
+                        {h}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              {agErr && (
+                <p className="fld__err" id="ag-err">
+                  {agErr}
+                </p>
+              )}
+
+              <button
+                className="pill pill--blue sheet__submit"
+                id="ag-submit"
+                type="button"
+                disabled={agSubmitting}
+                onClick={handleSubmitAgendar}
+              >
+                {agSubmitting ? 'Solicitando...' : 'Solicitar consulta'}
+              </button>
+            </div>
+          ) : (
+            <div className="sheet__done" id="ag-done">
+              <div className="sheet__check" aria-hidden="true">
+                ✓
+              </div>
+              <h3>Solicitud enviada</h3>
+              <p className="sheet__sub" id="ag-done-txt">
+                {agDoneTxt}
+              </p>
+              <button className="pill pill--ghost" onClick={handleCloseAgendar} type="button">
+                Cerrar
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
