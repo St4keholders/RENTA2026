@@ -1,4 +1,5 @@
 export const ASSET_BASE = 'https://11qxl2z9wnwj1jis.public.blob.vercel-storage.com/';
+export const LOCAL_ASSET_BASE = '/arquetipos/';
 
 export type Archetype = {
   n: string;
@@ -17,7 +18,7 @@ export type Archetype = {
 export const ARCHETYPES: Archetype[] = [
   {
     n: 'El Emperador',
-    img: 'EMPERADOR.png',
+    img: '/arquetipos/EMPERADOR.webp',
     vid: 'EMPERADOR.mp4',
     c2: '#4a2c06',
     accent: '#F0B93C',
@@ -30,7 +31,7 @@ export const ARCHETYPES: Archetype[] = [
   },
   {
     n: 'El Mago',
-    img: 'MAGO.png',
+    img: '/arquetipos/MAGO.webp',
     vid: 'EL%20MAGO.mp4',
     c2: '#0e3524',
     accent: '#4ED6A1',
@@ -43,7 +44,7 @@ export const ARCHETYPES: Archetype[] = [
   },
   {
     n: 'El Gladiador',
-    img: 'GLADIADOR.png',
+    img: '/arquetipos/GLADIADOR.webp',
     vid: 'GLADIADOR.mp4',
     c2: '#1b1d21',
     accent: '#D7DEE6',
@@ -56,7 +57,7 @@ export const ARCHETYPES: Archetype[] = [
   },
   {
     n: 'El Malabarista',
-    img: 'MALABARISTA.png',
+    img: '/arquetipos/MALABARISTA.webp',
     vid: 'EL%20MALABARISTA.mp4',
     c2: '#33373c',
     accent: '#C9CE34',
@@ -69,7 +70,7 @@ export const ARCHETYPES: Archetype[] = [
   },
   {
     n: 'El Mochilero',
-    img: 'MOCHILERO.png',
+    img: '/arquetipos/MOCHILERO.webp',
     vid: 'EL%20MOCHILERO.mp4',
     c2: '#2c1a52',
     accent: '#B492F7',
@@ -82,7 +83,7 @@ export const ARCHETYPES: Archetype[] = [
   },
   {
     n: 'El Soñador',
-    img: 'SO%C3%91ADOR.png',
+    img: '/arquetipos/SO%C3%91ADOR.webp',
     vid: 'EL%20SO%C3%91ADOR.mp4',
     c2: '#0a2c52',
     accent: '#7DD3FC',

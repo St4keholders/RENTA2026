@@ -338,7 +338,25 @@ export default function Landing() {
           ctx.globalAlpha = 1;
         };
 
+        let isStarsVisible = true;
+        const starsObserver = new IntersectionObserver(([entry]) => {
+          isStarsVisible = entry.isIntersecting;
+          if (isStarsVisible && !REDUCE) {
+            if (!starsRaf) loopStars();
+          } else {
+            if (starsRaf) {
+              cancelAnimationFrame(starsRaf);
+              starsRaf = null;
+            }
+          }
+        }, { threshold: 0.05 });
+        starsObserver.observe(cv);
+
         const loopStars = () => {
+          if (!isStarsVisible) {
+            starsRaf = null;
+            return;
+          }
           drawStars();
           starsRaf = requestAnimationFrame(loopStars);
         };
@@ -360,6 +378,7 @@ export default function Landing() {
         window.addEventListener('scroll', handleScrollStars, { passive: true });
 
         starsCleanup = () => {
+          starsObserver.disconnect();
           if (starsRaf) cancelAnimationFrame(starsRaf);
           window.removeEventListener('resize', handleResizeStars);
           window.removeEventListener('scroll', handleScrollStars);
@@ -408,8 +427,10 @@ export default function Landing() {
     const ticks: Array<() => void> = [];
     const measures: Array<() => void> = [];
     let pending = false;
+    let currentScrollY = window.scrollY;
 
     const onScroll = () => {
+      currentScrollY = window.scrollY;
       if (pending) return;
       pending = true;
       requestAnimationFrame(() => {
@@ -419,8 +440,9 @@ export default function Landing() {
     };
 
     const remeasure = () => {
+      currentScrollY = window.scrollY;
       measures.forEach((f) => f());
-      onScroll();
+      ticks.forEach((f) => f());
     };
 
     window.addEventListener('scroll', onScroll, { passive: true });
@@ -435,7 +457,7 @@ export default function Landing() {
     // Header Navbar stuck state
     const nav = root.querySelector('#nav');
     if (nav) {
-      ticks.push(() => nav.classList.toggle('stuck', window.scrollY > 24));
+      ticks.push(() => nav.classList.toggle('stuck', currentScrollY > 24));
     }
 
     // Ticker Marquee
@@ -443,10 +465,16 @@ export default function Landing() {
     if (t && !t.getAttribute('data-duplicated')) {
       t.innerHTML += t.innerHTML;
       t.setAttribute('data-duplicated', 'true');
-      const half = () => t.scrollWidth / 2;
+      let cachedHalf = 1;
+      const measureTicker = () => {
+        cachedHalf = Math.max(t.scrollWidth / 2, 1);
+      };
+      measures.push(measureTicker);
+      measureTicker();
+
       ticks.push(() => {
-        const x = -((window.scrollY * 0.28) % Math.max(half(), 1));
-        t.style.transform = `translate3d(${x}px,0,0)`;
+        const x = -((currentScrollY * 0.28) % cachedHalf);
+        t.style.transform = `translate3d(${x.toFixed(1)}px,0,0)`;
       });
     }
 
@@ -472,9 +500,12 @@ export default function Landing() {
       };
 
       const tick = () => {
-        const p = clamp((window.scrollY - top) / dist, 0, 1);
-        track.style.transform = `translate3d(${(-p * travel).toFixed(2)}px,0,0)`;
-        if (bar) bar.style.transform = `scaleX(${p.toFixed(4)})`;
+        const p = clamp((currentScrollY - top) / dist, 0, 1);
+        // Only transform if section is anywhere near viewport range
+        if (p >= -0.2 && p <= 1.2) {
+          track.style.transform = `translate3d(${(-p * travel).toFixed(1)}px,0,0)`;
+          if (bar) bar.style.transform = `scaleX(${p.toFixed(4)})`;
+        }
       };
 
       measures.push(measure);
@@ -503,18 +534,34 @@ export default function Landing() {
       slots.forEach((s) => cio.observe(s));
     }
 
-    ticks.push(() => {
-      const vh = window.innerHeight,
-        mid = vh / 2;
-      for (const s of slots) {
-        const cardEl = s.querySelector('.card');
-        if (!cardEl) continue;
+    let slotMetrics: Array<{ slot: HTMLElement; top: number; height: number }> = [];
+    const measureSlots = () => {
+      slotMetrics = slots.map((s) => {
+        const cardEl = (s.querySelector('.card') as HTMLElement) || s;
         const r = cardEl.getBoundingClientRect();
-        if (r.bottom < -200 || r.top > vh + 200) {
+        return {
+          slot: s,
+          top: r.top + window.scrollY,
+          height: r.height,
+        };
+      });
+    };
+    measures.push(measureSlots);
+
+    ticks.push(() => {
+      const vh = window.innerHeight;
+      const mid = vh / 2;
+      for (let i = 0; i < slotMetrics.length; i++) {
+        const { slot: s, top: slotTop, height: slotHeight } = slotMetrics[i];
+        const topInViewport = slotTop - currentScrollY;
+        const bottomInViewport = topInViewport + slotHeight;
+
+        if (bottomInViewport < -200 || topInViewport > vh + 200) {
           s.style.setProperty('--glow', '0');
           continue;
         }
-        const d = Math.abs(r.top + r.height / 2 - mid) / vh;
+        const cardCenter = topInViewport + slotHeight / 2;
+        const d = Math.abs(cardCenter - mid) / vh;
         const g = Math.max(0, 1 - d * 2.2);
         s.style.setProperty('--glow', (g * g * 0.5).toFixed(3));
       }
@@ -764,7 +811,12 @@ export default function Landing() {
                   <div className="splash" aria-hidden="true" />
                   <div className="card" data-i={i}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={ASSET_BASE + a.img} alt={`Carta de ${a.n}`} loading="lazy" decoding="async" />
+                    <img
+                      src={a.img.startsWith('/') ? a.img : ASSET_BASE + a.img}
+                      alt={`Carta de ${a.n}`}
+                      loading={i < 3 ? "eager" : "lazy"}
+                      decoding="async"
+                    />
                     <button
                       type="button"
                       className="card__hit"
@@ -897,7 +949,7 @@ export default function Landing() {
             {/* STAGE 1: VIDEO PRESENTATION */}
             <div className="modal__stage" id="m-stage">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img id="m-poster" src={ASSET_BASE + activeArchetype.img} alt="" />
+              <img id="m-poster" src={activeArchetype.img.startsWith('/') ? activeArchetype.img : ASSET_BASE + activeArchetype.img} alt="" />
               <video
                 ref={videoRef}
                 id="m-video"
