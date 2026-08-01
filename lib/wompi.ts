@@ -10,10 +10,10 @@ export interface WompiConfig {
 
 export function getWompiConfig(): WompiConfig {
   const env = ((process.env.WOMPI_ENV || 'prod').trim()) as 'test' | 'prod';
-  const publicKey = (process.env.WOMPI_PUBLIC_KEY || 'pub_prod_ePUJ99tTiBJWN848shFJjFMAPkkTdC1N').trim();
-  const privateKey = (process.env.WOMPI_PRIVATE_KEY || 'prv_prod_Rgz9vyg48uFT1qOg8wKAMBFzyPp9QPt1').trim();
-  const integritySecret = (process.env.WOMPI_INTEGRITY_SECRET || (publicKey.startsWith('pub_prod_') ? 'prod_integrity_SgV6nnTv2jKHjvGSy3436onFZ10AXGth' : 'test_integrity_bllnWEfC38sHDEBlTqVBDfHq6Bx63k8D')).trim();
-  const eventsSecret = (process.env.WOMPI_EVENTS_SECRET || (publicKey.startsWith('pub_prod_') ? 'prod_events_60q0Etk5DiW2IpZqMU1llCCIpqwlO4C' : 'test_events_jmPRYmPLOuXvqWagim8zihjQU9poXh5p')).trim();
+  const publicKey = (process.env.WOMPI_PUBLIC_KEY || 'pub_prod_ePUJ99tTiBJWN848sNEjjFMAPkKIdC1N').trim();
+  const privateKey = (process.env.WOMPI_PRIVATE_KEY || 'prv_prod_Rgz9vyg40uFTiqOg0wKAMBFzyPp9QPti').trim();
+  const integritySecret = (process.env.WOMPI_INTEGRITY_SECRET || (publicKey.startsWith('pub_prod_') ? 'prod_integrity_SgV6nnTv2jKHjvGSy3436onFZi0AXGfh' : 'test_integrity_bllnWEfC38sHDEBlTqVBDfHq6Bx63k8D')).trim();
+  const eventsSecret = (process.env.WOMPI_EVENTS_SECRET || (publicKey.startsWith('pub_prod_') ? 'prod_events_6Bq8Etk5DiWZIpZqNUilliCCIpqwlO4C' : 'test_events_jmPRYmPLOuXvqWagim8zihjQU9poXh5p')).trim();
 
   return { env, publicKey, privateKey, integritySecret, eventsSecret };
 }
