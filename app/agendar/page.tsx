@@ -314,7 +314,7 @@ function AgendarContent() {
       </h1>
 
       <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', margin: '0 0 20px', lineHeight: 1.5 }}>
-        1 hora de asesoría personalizada con un contador experto por <strong style={{ color: '#4ED6A1' }}>$100.000 COP</strong>. El monto pagado se abona al valor final de tu declaración.
+        1 hora de asesoría personalizada con un contador experto por <strong style={{ color: '#4ED6A1' }}>$50.000 COP</strong>. El monto pagado se abona al valor final de tu declaración.
       </p>
 
       {errorMsg && (
@@ -475,7 +475,7 @@ function AgendarContent() {
             <span style={{ fontSize: 10, color: '#4ED6A1', fontFamily: 'var(--mono)' }}>Abonable a tu declaración</span>
           </div>
           <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 18, color: '#4ED6A1' }}>
-            $100.000 COP
+            $50.000 COP
           </span>
         </div>
 
@@ -492,7 +492,7 @@ function AgendarContent() {
             marginTop: 6,
           }}
         >
-          {loading ? 'Generando pasarela...' : 'Ir a Pagar ($100.000 COP) →'}
+          {loading ? 'Generando pasarela...' : 'Ir a Pagar ($50.000 COP) →'}
         </button>
       </form>
     </div>

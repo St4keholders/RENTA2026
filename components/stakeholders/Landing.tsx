@@ -218,7 +218,7 @@ export default function Landing() {
 
       const data = await res.json();
 
-      // Redirigir automáticamente al cobro de Wompi ($100.000 COP)
+      // Redirigir automáticamente al cobro de Wompi ($50.000 COP)
       try {
         const checkoutRes = await fetch('/api/checkout', {
           method: 'POST',

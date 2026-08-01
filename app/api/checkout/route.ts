@@ -6,7 +6,7 @@ export async function POST(request: Request) {
   try {
     const { customer_email, customer_name, customer_phone, lead_slug, lead_id } = await request.json();
 
-    const amountInCents = 10000000; // $100.000 COP en centavos
+    const amountInCents = 5000000; // $50.000 COP en centavos
     const currency = 'COP';
     const reference = `RENTA-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
@@ -54,14 +54,17 @@ export async function POST(request: Request) {
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mirentaya.co';
     const redirectUrl = `${siteUrl}/pagos/respuesta?reference=${reference}`;
-    const checkoutUrl =
-      `https://checkout.wompi.co/p/` +
-      `?public-key=${publicKey}` +
-      `&currency=${currency}` +
-      `&amount-in-cents=${amountInCents}` +
-      `&reference=${reference}` +
-      `&signature:integrity=${signature}` +
-      `&redirect-url=${encodeURIComponent(redirectUrl)}`;
+
+    const params = new URLSearchParams({
+      'public-key': publicKey,
+      'currency': currency,
+      'amount-in-cents': amountInCents.toString(),
+      'reference': reference,
+      'signature:integrity': signature,
+      'redirect-url': redirectUrl,
+    });
+
+    const checkoutUrl = `https://checkout.wompi.co/p/?${params.toString()}`;
 
     console.log('[checkout] URL generada OK →', checkoutUrl);
 

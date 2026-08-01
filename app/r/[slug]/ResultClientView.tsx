@@ -563,7 +563,7 @@ export default function ResultClientView({ lead }: { lead: LeadData }) {
               : 'Una revisión experta te certifica si estás libre de declarar.'}
           </p>
           <p style={{ fontFamily: 'var(--mono)', fontSize: 11, color: '#3D6BFF', margin: '0 0 20px', letterSpacing: '.06em' }}>
-            $100.000 COP · Abonables al servicio
+            $50.000 COP · Abonables al servicio
           </p>
           <button onClick={handleOpenAgendar} className="pill pill--blue" type="button">
             Agendar Asesoría →
