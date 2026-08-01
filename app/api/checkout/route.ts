@@ -2,6 +2,53 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { generateIntegritySignature, getWompiConfig } from '@/lib/wompi';
 
+// Función auxiliar para guardar en Supabase de forma no bloqueante (segundo plano)
+async function saveOrderAsync(
+  reference: string,
+  amountInCents: number,
+  currency: string,
+  customer_email?: string | null,
+  customer_name?: string | null,
+  customer_phone?: string | null,
+  lead_slug?: string | null,
+  lead_id?: string | null
+) {
+  try {
+    const supabase = supabaseAdmin();
+    let resolvedLeadId: string | null = lead_id || null;
+    if (!resolvedLeadId && lead_slug) {
+      const { data: leadData } = await supabase
+        .from('leads')
+        .select('id')
+        .eq('slug_publico', lead_slug)
+        .single();
+      resolvedLeadId = leadData?.id ?? null;
+    }
+
+    const { error: orderError } = await supabase
+      .from('orders')
+      .insert({
+        reference,
+        amount_in_cents: amountInCents,
+        currency,
+        customer_email: customer_email || null,
+        customer_name: customer_name || null,
+        customer_phone: customer_phone || null,
+        status: 'PENDING',
+        lead_slug: lead_slug || null,
+        lead_id: resolvedLeadId,
+      });
+
+    if (orderError) {
+      console.warn('[checkout] No se pudo crear orden en Supabase:', orderError.message);
+    } else {
+      console.log(`✅ [checkout] Orden ${reference} creada con lead_id: ${resolvedLeadId}`);
+    }
+  } catch (dbErr: any) {
+    console.warn('[checkout] Error de base de datos (no bloquea):', dbErr?.message);
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const { customer_email, customer_name, customer_phone, lead_slug, lead_id } = await request.json();
@@ -10,61 +57,33 @@ export async function POST(request: Request) {
     const currency = 'COP';
     const reference = `RENTA-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
-    // 1. Intentar guardar orden en Supabase (no bloquea si falla)
-    try {
-      const supabase = supabaseAdmin();
+    // 1. Iniciar guardado en Supabase en segundo plano sin bloquear la respuesta
+    saveOrderAsync(
+      reference,
+      amountInCents,
+      currency,
+      customer_email,
+      customer_name,
+      customer_phone,
+      lead_slug,
+      lead_id
+    );
 
-      // Resolver lead_id desde lead_id directo o lead_slug
-      let resolvedLeadId: string | null = lead_id || null;
-      if (!resolvedLeadId && lead_slug) {
-        const { data: leadData } = await supabase
-          .from('leads')
-          .select('id')
-          .eq('slug_publico', lead_slug)
-          .single();
-        resolvedLeadId = leadData?.id ?? null;
-      }
-
-      const { error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          reference,
-          amount_in_cents: amountInCents,
-          currency,
-          customer_email: customer_email || null,
-          customer_name: customer_name || null,
-          customer_phone: customer_phone || null,
-          status: 'PENDING',
-          lead_slug: lead_slug || null,
-          lead_id: resolvedLeadId,
-        });
-
-      if (orderError) {
-        console.warn('[checkout] No se pudo crear orden en Supabase:', orderError.message);
-      } else {
-        console.log(`✅ [checkout] Orden ${reference} creada con lead_id: ${resolvedLeadId}`);
-      }
-    } catch (dbErr: any) {
-      console.warn('[checkout] Error de base de datos (no bloquea):', dbErr?.message);
-    }
-
-    // 2. Siempre generar firma y URL de Wompi
+    // 2. Generar firma y URL de Wompi de inmediato
     const signature = generateIntegritySignature(reference, amountInCents, currency);
     const { publicKey } = getWompiConfig();
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mirentaya.co';
     const redirectUrl = `${siteUrl}/pagos/respuesta?reference=${reference}`;
 
-    const params = new URLSearchParams({
-      'public-key': publicKey,
-      'currency': currency,
-      'amount-in-cents': amountInCents.toString(),
-      'reference': reference,
-      'signature:integrity': signature,
-      'redirect-url': redirectUrl,
-    });
-
-    const checkoutUrl = `https://checkout.wompi.co/p/?${params.toString()}`;
+    const checkoutUrl =
+      `https://checkout.wompi.co/p/` +
+      `?public-key=${encodeURIComponent(publicKey)}` +
+      `&currency=${encodeURIComponent(currency)}` +
+      `&amount-in-cents=${amountInCents}` +
+      `&reference=${encodeURIComponent(reference)}` +
+      `&signature:integrity=${signature}` +
+      `&redirect-url=${encodeURIComponent(redirectUrl)}`;
 
     console.log('[checkout] URL generada OK →', checkoutUrl);
 

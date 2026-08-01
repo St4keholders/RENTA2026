@@ -304,8 +304,10 @@ export default function ResultClientView({ lead }: { lead: LeadData }) {
       const formattedDateStr = `${year}-${month}-${day}`;
       const fechaConsulta = `${formattedDateStr}T${agHoraSelected || '08:00'}:00Z`;
 
-      // 1. Guardar la cita
-      await fetch('/api/ventas', {
+      setAgDoneTxt(`Gracias, ${agNombre.trim().split(' ')[0]}. Redirigiendo al pago de tu consultoría...`);
+
+      // Guardar cita y generar checkout de forma paralela para acelerar la redirección
+      const ventasPromise = fetch('/api/ventas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -313,12 +315,9 @@ export default function ResultClientView({ lead }: { lead: LeadData }) {
           fechaConsulta,
           medioContacto: agMedio,
         }),
-      });
+      }).catch((err) => console.warn('[ResultClientView] Error guardando cita:', err));
 
-      setAgDoneTxt(`Gracias, ${agNombre.trim().split(' ')[0]}. Redirigiendo al pago de tu consultoría...`);
-
-      // 2. Redirigir a Wompi ($100.000 COP)
-      const checkoutRes = await fetch('/api/checkout', {
+      const checkoutPromise = fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -329,10 +328,14 @@ export default function ResultClientView({ lead }: { lead: LeadData }) {
         }),
       });
 
-      const dataCheckout = await checkoutRes.json();
-      if (dataCheckout.checkoutUrl) {
-        window.location.href = dataCheckout.checkoutUrl;
-        return;
+      const [, checkoutRes] = await Promise.all([ventasPromise, checkoutPromise]);
+
+      if (checkoutRes && checkoutRes.ok) {
+        const dataCheckout = await checkoutRes.json();
+        if (dataCheckout.checkoutUrl) {
+          window.location.href = dataCheckout.checkoutUrl;
+          return;
+        }
       }
       throw new Error('No se pudo generar enlace de cobro');
     } catch (err) {

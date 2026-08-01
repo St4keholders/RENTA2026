@@ -203,7 +203,8 @@ export default function Landing() {
       const day = String(agDateSelected.getDate()).padStart(2, '0');
       const formattedDateStr = `${year}-${month}-${day}`;
 
-      const res = await fetch('/api/agendar', {
+      // Disparar agendamiento y checkout en paralelo
+      const agendarPromise = fetch('/api/agendar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -214,28 +215,26 @@ export default function Landing() {
           hora: agHoraSelected || '08:00',
           medio_contacto: agMedio,
         }),
+      }).catch((err) => console.warn('[Landing] Error en agendar:', err));
+
+      const checkoutPromise = fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_name: agNombre,
+          customer_email: agCorreo,
+          customer_phone: agTel,
+        }),
       });
 
-      const data = await res.json();
+      const [, checkoutRes] = await Promise.all([agendarPromise, checkoutPromise]);
 
-      // Redirigir automáticamente al cobro de Wompi ($50.000 COP)
-      try {
-        const checkoutRes = await fetch('/api/checkout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            customer_name: agNombre,
-            customer_email: agCorreo,
-            customer_phone: agTel,
-          }),
-        });
+      if (checkoutRes && checkoutRes.ok) {
         const dataCheckout = await checkoutRes.json();
         if (dataCheckout.checkoutUrl) {
           window.location.href = dataCheckout.checkoutUrl;
           return;
         }
-      } catch (chkErr) {
-        console.error('Error al iniciar pasarela de cobro:', chkErr);
       }
 
       const f = agDateSelected;

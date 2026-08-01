@@ -248,8 +248,8 @@ function AgendarContent() {
       const refParam = searchParams.get('ref') || (typeof document !== 'undefined' ? (document.cookie.match(/(?:^|; )rentash_ref=([^;]*)/)?.[1] ? decodeURIComponent(document.cookie.match(/(?:^|; )rentash_ref=([^;]*)/)![1]) : null) : null);
       const fechaConsulta = `${fecha}T${hora}:00Z`;
 
-      // 1. Registrar cita y atribuir referido en backend
-      const agendarRes = await fetch('/api/agendar', {
+      // Registrar cita y generar cobro en paralelo para máxima velocidad
+      const agendarPromise = fetch('/api/agendar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -261,27 +261,29 @@ function AgendarContent() {
           medio_contacto: medioContacto,
           ref: refParam || undefined,
         }),
-      });
-      const agendarData = await agendarRes.json();
+      }).catch((err) => console.warn('[Agendar] Error agendando:', err));
 
-      // 2. Generar cobro Wompi ($100.000 COP)
-      const checkoutRes = await fetch('/api/checkout', {
+      const checkoutPromise = fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           lead_slug: leadSlug || undefined,
-          lead_id: agendarData?.leadId || undefined,
           customer_name: nombre.trim(),
           customer_email: correo.trim() || undefined,
+          customer_phone: celular.trim(),
         }),
       });
-      const checkoutData = await checkoutRes.json();
 
-      if (checkoutData.checkoutUrl) {
-        window.location.href = checkoutData.checkoutUrl;
-      } else {
-        throw new Error('No se pudo generar la pasarela de pago');
+      const [, checkoutRes] = await Promise.all([agendarPromise, checkoutPromise]);
+
+      if (checkoutRes && checkoutRes.ok) {
+        const checkoutData = await checkoutRes.json();
+        if (checkoutData.checkoutUrl) {
+          window.location.href = checkoutData.checkoutUrl;
+          return;
+        }
       }
+      throw new Error('No se pudo generar la pasarela de pago');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error inesperado al agendar';
       setErrorMsg(msg);
