@@ -204,10 +204,19 @@ export default function ResultClientView({ lead }: { lead: LeadData }) {
     return () => { document.body.style.backgroundColor = prev; };
   }, []);
 
-  /* Meta Pixel — Lead: se dispara cuando el usuario ve su resultado */
+  /* Meta Pixel — Lead: dedup por slug para no inflar conversiones
+     en recargas, visitas repetidas o links compartidos desde el mismo dispositivo. */
   useEffect(() => {
+    const key = `lead_sent_${lead.slug_publico}`;
+    try {
+      if (localStorage.getItem(key)) return;
+      localStorage.setItem(key, '1');
+    } catch {
+      // Safari en privado puede romper localStorage;
+      // preferimos un falso positivo ocasional a perder la conversión real.
+    }
     trackLead();
-  }, []);
+  }, [lead.slug_publico]);
 
   /* Modal Card */
   const handleOpenCard = () => {
