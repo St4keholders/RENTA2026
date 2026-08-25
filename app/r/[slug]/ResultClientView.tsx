@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ARCHETYPES, ASSET_BASE } from '@/components/stakeholders/archetypes';
+import { trackLead } from '@/components/MetaPixel';
 
 const FADE_STYLE = `
 @keyframes fadeOutScreen {
@@ -201,6 +202,11 @@ export default function ResultClientView({ lead }: { lead: LeadData }) {
     const prev = document.body.style.backgroundColor;
     document.body.style.backgroundColor = '#000';
     return () => { document.body.style.backgroundColor = prev; };
+  }, []);
+
+  /* Meta Pixel — Lead: se dispara cuando el usuario ve su resultado */
+  useEffect(() => {
+    trackLead();
   }, []);
 
   /* Modal Card */
